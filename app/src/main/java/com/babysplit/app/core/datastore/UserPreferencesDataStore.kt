@@ -49,6 +49,10 @@ class UserPreferencesDataStore(private val context: Context) {
         prefs[USER_EMAIL]
     }
 
+    suspend fun getUserEmailDirect(): String? {
+        return kotlinx.coroutines.flow.firstOrNull(context.dataStore.data)?.get(USER_EMAIL)
+    }
+
     suspend fun saveUserProfile(name: String, email: String?, avatarUrl: String? = null) {
         context.dataStore.edit { prefs ->
             prefs[USER_NAME] = name

@@ -157,7 +157,21 @@ object GoogleDriveBackupEngine {
             val jsonContent = rootJson.toString(2)
             val fileName = "trip_${group.name.replace("[^a-zA-Z0-9]".toRegex(), "_")}_backup.json"
 
-            // 1. Save via Android MediaStore (survives app uninstallation on Android 10-15+)
+            // 1. Upload to Real Google Drive Cloud (if user linked Google Account)
+            try {
+                val userPrefs = com.babysplit.app.core.datastore.UserPreferencesDataStore(context)
+                val userEmail = userPrefs.getUserEmailDirect()
+                if (!userEmail.isNullOrBlank()) {
+                    val token = GoogleDriveCloudClient.getAccessToken(context, userEmail)
+                    if (!token.isNullOrBlank()) {
+                        GoogleDriveCloudClient.uploadOrUpdateBackup(token, fileName, jsonContent)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // 2. Save via Android MediaStore (survives app uninstallation on Android 10-15+)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 try {
                     val resolver = context.contentResolver
@@ -180,7 +194,7 @@ object GoogleDriveBackupEngine {
                 }
             }
 
-            // 2. Save to persistent file directories
+            // 3. Save to persistent file directories
             val targetDirs = getPersistentBackupDirs(context)
             for (dir in targetDirs) {
                 try {
@@ -199,13 +213,31 @@ object GoogleDriveBackupEngine {
     }
 
     /**
-     * Searches all persistent storage directories and MediaStore on the device for Baby Split trip backups.
+     * Searches all persistent storage directories, Google Drive Cloud servers, and MediaStore for trip backups.
      */
     suspend fun searchForDriveBackups(context: Context, email: String): List<DriveBackupItem> = withContext(Dispatchers.IO) {
         val backupsMap = mutableMapOf<String, DriveBackupItem>()
         val resolver = context.contentResolver
 
-        // 1. Search via MediaStore (reads files created by previous app installs)
+        // 1. Search Google Drive Cloud servers directly (if email provided)
+        if (email.isNotBlank()) {
+            try {
+                val token = GoogleDriveCloudClient.getAccessToken(context, email)
+                if (!token.isNullOrBlank()) {
+                    val cloudBackups = GoogleDriveCloudClient.searchDriveFiles(token)
+                    for (item in cloudBackups) {
+                        val key = "${item.tripName.trim().lowercase()}_${item.emoji}"
+                        if (!backupsMap.containsKey(key) || (backupsMap[key]?.timestampMs ?: 0L) < item.timestampMs) {
+                            backupsMap[key] = item
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 2. Search via MediaStore (reads files created by previous app installs)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             try {
                 val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
