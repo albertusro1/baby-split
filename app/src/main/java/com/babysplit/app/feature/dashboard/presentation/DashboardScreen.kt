@@ -29,48 +29,9 @@ fun DashboardScreen(
     onCreateGroupClick: () -> Unit,
     onJoinTripClick: () -> Unit = {},
     onProfileClick: () -> Unit,
-    onDeleteGroup: (Long) -> Unit = {},
-    onRestoreDiscoveredBackups: (List<com.babysplit.app.core.gdrive.DriveBackupItem>) -> Unit = {}
+    onDeleteGroup: (Long) -> Unit = {}
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
     var groupToDelete by remember { mutableStateOf<GroupEntity?>(null) }
-
-    val dashboardDocumentPicker = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                try {
-                    val content = context.contentResolver.openInputStream(uri)?.use { stream ->
-                        stream.bufferedReader().readText()
-                    }
-                    if (!content.isNullOrBlank()) {
-                        val json = org.json.JSONObject(content)
-                        val name = json.optString("name", "Imported Trip")
-                        val emoji = json.optString("emoji", "✈️")
-                        val membersCount = json.optJSONArray("members")?.length() ?: 1
-                        val expensesCount = json.optJSONArray("expenses")?.length() ?: 0
-                        val timestamp = json.optLong("updatedAtEpochMs", json.optLong("createdAtEpochMs", System.currentTimeMillis()))
-
-                        val backupItem = com.babysplit.app.core.gdrive.DriveBackupItem(
-                            id = uri.toString(),
-                            tripName = name,
-                            emoji = emoji,
-                            timestampMs = timestamp,
-                            membersCount = membersCount,
-                            expensesCount = expensesCount,
-                            rawJson = content
-                        )
-                        onRestoreDiscoveredBackups(listOf(backupItem))
-                        android.widget.Toast.makeText(context, "Restored trip '$name' successfully! 🎉", android.widget.Toast.LENGTH_LONG).show()
-                    }
-                } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, "Failed to import trip: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
 
     Scaffold(
         containerColor = BackgroundLight,

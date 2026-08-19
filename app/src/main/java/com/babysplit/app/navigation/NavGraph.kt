@@ -148,13 +148,6 @@ fun NavGraph(
                     if (trip != null) {
                         dashboardViewModel.deleteTrip(trip.id)
                     }
-                },
-                onRestoreDiscoveredBackups = { backups ->
-                    scope.launch {
-                        for (backup in backups) {
-                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(app.database, backup)
-                        }
-                    }
                 }
             )
 
@@ -398,13 +391,6 @@ fun NavGraph(
                 onBackClick = { navController.popBackStack() },
                 onSavePaymentDetails = { bank, holder, account, wallet, handle, note, curr ->
                     profileViewModel.savePaymentDetails(bank, holder, account, wallet, handle, note, curr)
-                },
-                onRestoreBackups = { backups ->
-                    scope.launch {
-                        for (backup in backups) {
-                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(app.database, backup)
-                        }
-                    }
                 }
             )
         }
