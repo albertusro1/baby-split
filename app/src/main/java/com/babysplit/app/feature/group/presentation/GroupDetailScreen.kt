@@ -270,9 +270,11 @@ private fun ExpensesTab(
     currency: String,
     onShareSingleExpense: (Expense) -> Unit
 ) {
+    var viewingReceiptPath by remember { mutableStateOf<String?>(null) }
+
     if (expenses.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No expenses added yet.\nTap '+ Add Expense' below!", color = Color.Gray)
+            Text("No expenses added yet.\nTap '+ Add Expense' below!", color = TextSecondary, textAlign = TextAlign.Center)
         }
         return
     }
@@ -280,53 +282,133 @@ private fun ExpensesTab(
     val dateFormatter = SimpleDateFormat("MMM dd", Locale.getDefault())
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(expenses) { expense ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                border = BorderStroke(1.dp, SurfaceBorderLight)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(expense.category.emoji, fontSize = 20.sp)
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Surface(
+                                shape = CircleShape,
+                                color = ChickYellowLight,
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(expense.category.emoji, fontSize = 20.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(expense.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
+                                Text(
+                                    "Paid by ${expense.paidByMemberName} • ${dateFormatter.format(Date(expense.createdAtEpochMs))}",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary
+                                )
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(expense.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "Paid by ${expense.paidByMemberName} • ${dateFormatter.format(Date(expense.createdAtEpochMs))}",
-                                fontSize = 12.sp,
-                                color = Color.Gray
+                                BillSummaryFormatter.formatCents(expense.totalAmountCents, expense.currency),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = ChickAmber
                             )
+                            IconButton(onClick = { onShareSingleExpense(expense) }) {
+                                Icon(Icons.Filled.Share, contentDescription = "Share", tint = WhatsAppGreen)
+                            }
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            BillSummaryFormatter.formatCents(expense.totalAmountCents, expense.currency),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
-                        IconButton(onClick = { onShareSingleExpense(expense) }) {
-                            Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color(0xFF25D366))
+
+                    // If receipt photo is attached, display interactive view receipt chip
+                    if (!expense.receiptImagePath.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewingReceiptPath = expense.receiptImagePath },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = ChickYellowSubtle,
+                                border = BorderStroke(1.dp, ChickGold)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Filled.ReceiptLong, contentDescription = null, tint = ChickAmber, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("View Receipt Photo 📸", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7A4F00))
+                                }
+                            }
                         }
                     }
                 }
             }
         }
         item { Spacer(modifier = Modifier.height(80.dp)) }
+    }
+
+    // Receipt Photo Viewer Dialog
+    if (viewingReceiptPath != null) {
+        AlertDialog(
+            onDismissRequest = { viewingReceiptPath = null },
+            containerColor = SurfaceLight,
+            shape = RoundedCornerShape(18.dp),
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Receipt Photo 🧾", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    IconButton(onClick = { viewingReceiptPath = null }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close")
+                    }
+                }
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 450.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    coil3.compose.AsyncImage(
+                        model = java.io.File(viewingReceiptPath!!),
+                        contentDescription = "Receipt Image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewingReceiptPath = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White)
+                ) {
+                    Text("Done")
+                }
+            }
+        )
     }
 }
 
