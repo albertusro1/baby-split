@@ -285,7 +285,7 @@ fun DashboardScreen(
                                                 text = if (group.isFinished) "Settled ✅" else "Active • ${group.currency}",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = if (group.isFinished) SettledGreen else Color(0xFF8A5B00),
+                                                color = if (group.isFinished) SettledGreen else TurquoiseDark,
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
                                         }

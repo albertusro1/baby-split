@@ -458,7 +458,7 @@ private fun ExpensesTab(
                                 ) {
                                     Icon(Icons.Filled.ReceiptLong, contentDescription = null, tint = ChickAmber, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("View Receipt Photo 📸", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7A4F00))
+                                    Text("View Receipt Photo 📸", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TurquoiseDark)
                                 }
                             }
                         }

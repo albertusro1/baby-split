@@ -8,14 +8,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val LightColorScheme = lightColorScheme(
-    primary = ChickAmber,
+    primary = TurquoisePrimary,
     onPrimary = Color.White,
-    primaryContainer = ChickYellowLight,
-    onPrimaryContainer = Color(0xFF5E3900),
-    secondary = ChickGold,
-    onSecondary = Color(0xFF1C1B1F),
-    secondaryContainer = ChickYellowSubtle,
-    onSecondaryContainer = Color(0xFF4A3400),
+    primaryContainer = TurquoiseLight,
+    onPrimaryContainer = TurquoiseDark,
+    secondary = TurquoiseMint,
+    onSecondary = Color.White,
+    secondaryContainer = TurquoiseSubtle,
+    onSecondaryContainer = TurquoiseDark,
     tertiary = WhatsAppDarkGreen,
     onTertiary = Color.White,
     background = BackgroundLight,
