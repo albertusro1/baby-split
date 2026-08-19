@@ -186,13 +186,40 @@ fun GroupDetailScreen(
                     expenses = expenses,
                     currency = group.currency,
                     onShareSingleExpense = { exp ->
-                        val msg = "🧾 *${group.name} - Expense Split*\n" +
-                                "Item: *${exp.title}*\n" +
-                                "Total: ${BillSummaryFormatter.formatCents(exp.totalAmountCents, exp.currency)}\n" +
-                                "Paid by: ${exp.paidByMemberName}\n" +
-                                "Shares:\n" +
-                                exp.participants.joinToString("\n") { "• ${it.memberName}: ${BillSummaryFormatter.formatCents(it.amountCents, exp.currency)}" }
-                        WhatsAppShareHelper.shareToWhatsApp(context, msg)
+                        val sb = java.lang.StringBuilder()
+                        sb.appendLine("🧾 *${group.name} - Expense Split*")
+                        sb.appendLine("Item: *${exp.title}*")
+                        sb.appendLine("Total: ${BillSummaryFormatter.formatCents(exp.totalAmountCents, exp.currency)}")
+                        sb.appendLine("Paid by: *${exp.paidByMemberName}*")
+                        sb.appendLine("Shares:")
+                        exp.participants.forEach {
+                            sb.appendLine("• ${it.memberName}: ${BillSummaryFormatter.formatCents(it.amountCents, exp.currency)}")
+                        }
+                        sb.appendLine("----------------------------------------")
+                        val isHostPayer = paymentDetails != null && (
+                            exp.paidByMemberName.equals(paymentDetails.hostName, ignoreCase = true) ||
+                            exp.paidByMemberName.contains("Host", ignoreCase = true) ||
+                            exp.paidByMemberName.contains("You", ignoreCase = true)
+                        )
+                        if (isHostPayer && paymentDetails != null) {
+                            sb.appendLine("💳 *Please transfer to ${exp.paidByMemberName} (Host):*")
+                            if (!paymentDetails.bankAccountNumber.isNullOrBlank()) {
+                                val bank = paymentDetails.bankName ?: "Bank"
+                                val holder = if (!paymentDetails.accountHolderName.isNullOrBlank()) paymentDetails.accountHolderName else paymentDetails.hostName
+                                sb.appendLine("• *$bank*: ${paymentDetails.bankAccountNumber} (a.n. $holder)")
+                            }
+                            if (!paymentDetails.eWalletHandle.isNullOrBlank()) {
+                                val wallet = paymentDetails.eWalletName ?: "E-Wallet"
+                                sb.appendLine("• *$wallet*: ${paymentDetails.eWalletHandle}")
+                            }
+                            if (!paymentDetails.customNote.isNullOrBlank()) {
+                                sb.appendLine("• Note: ${paymentDetails.customNote}")
+                            }
+                        } else {
+                            sb.appendLine("💳 *Please transfer to ${exp.paidByMemberName}:*")
+                            sb.appendLine("• ℹ️ Please contact *${exp.paidByMemberName}* directly for their Bank / E-Wallet transfer details.")
+                        }
+                        WhatsAppShareHelper.shareToWhatsApp(context, sb.toString().trim())
                     }
                 )
                 1 -> BalancesTab(
@@ -538,13 +565,16 @@ private fun BalancesTab(
                                 val part = exp.participants.firstOrNull { it.memberId == balance.memberId }
                                 if (part != null) memberExpenses.add(exp to part.amountCents)
                             }
+                            val debtorTxs = simplifiedTransactions.filter { it.debtorId == balance.memberId }
                             val msg = BillSummaryFormatter.formatMemberWhatsAppMessage(
                                 tripName = groupName,
                                 memberName = balance.memberName,
                                 memberExpenses = memberExpenses,
                                 totalOwedCents = -balance.netBalanceCents,
                                 currency = currency,
-                                paymentDetails = paymentDetails
+                                paymentDetails = paymentDetails,
+                                debtorTransactions = debtorTxs,
+                                hostMemberName = paymentDetails?.hostName ?: "Host"
                             )
                             WhatsAppShareHelper.shareToWhatsApp(context, msg, member?.phoneNumber)
                         },

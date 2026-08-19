@@ -86,5 +86,53 @@ class BillSummaryFormatterTest {
         assertTrue(message.contains("987-654-321"))
         assertTrue(message.contains("Rowan Alexander"))
     }
+
+    @Test
+    fun testFormatMemberOwesNonHostCreditor() {
+        val paymentDetails = HostPaymentDetails(
+            hostName = "Rowan",
+            bankName = "BCA",
+            accountHolderName = "Rowan",
+            bankAccountNumber = "2450900365"
+        )
+
+        val expense = Expense(
+            groupId = 1L,
+            title = "Dinner by Itik",
+            totalAmountCents = 30000000L,
+            currency = "IDR",
+            category = ExpenseCategory.FOOD,
+            paidByMemberId = 3L,
+            paidByMemberName = "Itik",
+            splitType = SplitType.EQUAL,
+            participants = listOf(
+                ExpenseParticipant(2L, "Alice", 10000000L)
+            )
+        )
+
+        val tx = com.babysplit.app.feature.balance.domain.engine.DebtSimplificationEngine.SimplifiedTransaction(
+            debtorId = 2L,
+            debtorName = "Alice",
+            creditorId = 3L,
+            creditorName = "Itik",
+            amountCents = 10000000L
+        )
+
+        val message = BillSummaryFormatter.formatMemberWhatsAppMessage(
+            tripName = "Bali Trip",
+            memberName = "Alice",
+            memberExpenses = listOf(expense to 10000000L),
+            totalOwedCents = 10000000L,
+            currency = "IDR",
+            paymentDetails = paymentDetails,
+            debtorTransactions = listOf(tx),
+            hostMemberName = "Rowan"
+        )
+
+        assertTrue(message.contains("Pay *Itik*"))
+        assertTrue(message.contains("Please contact *Itik* directly"))
+        // Should NOT contain the host's bank account when Alice owes Itik!
+        org.junit.Assert.assertFalse(message.contains("2450900365"))
+    }
 }
 

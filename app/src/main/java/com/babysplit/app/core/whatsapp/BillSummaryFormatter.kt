@@ -41,8 +41,17 @@ object BillSummaryFormatter {
         }
     }
 
+    private fun isHostName(name: String?, hostMemberName: String?, paymentDetails: HostPaymentDetails?): Boolean {
+        if (name.isNullOrBlank()) return false
+        if (name.contains("Host", ignoreCase = true) || name.contains("You", ignoreCase = true)) return true
+        if (!hostMemberName.isNullOrBlank() && name.equals(hostMemberName, ignoreCase = true)) return true
+        if (paymentDetails != null && name.equals(paymentDetails.hostName, ignoreCase = true)) return true
+        return false
+    }
+
     /**
      * Formats an itemized breakdown for a specific member in WhatsApp Markdown.
+     * Only displays host bank details if the creditor is actually the host.
      */
     fun formatMemberWhatsAppMessage(
         tripName: String,
@@ -50,7 +59,9 @@ object BillSummaryFormatter {
         memberExpenses: List<Pair<Expense, Long>>, // Pair of (Expense, member's share cents)
         totalOwedCents: Long,
         currency: String,
-        paymentDetails: HostPaymentDetails?
+        paymentDetails: HostPaymentDetails?,
+        debtorTransactions: List<DebtSimplificationEngine.SimplifiedTransaction> = emptyList(),
+        hostMemberName: String? = null
     ): String {
         val sb = StringBuilder()
         sb.appendLine("🧾 *Baby Split - $tripName*")
@@ -77,20 +88,46 @@ object BillSummaryFormatter {
         }
         sb.appendLine("----------------------------------------")
 
-        if (totalOwedCents > 0 && paymentDetails != null) {
+        if (totalOwedCents > 0) {
             sb.appendLine()
-            sb.appendLine("💳 *Please transfer to:*")
-            if (!paymentDetails.bankAccountNumber.isNullOrBlank()) {
-                val bank = paymentDetails.bankName ?: "Bank"
-                val holder = if (!paymentDetails.accountHolderName.isNullOrBlank()) paymentDetails.accountHolderName else paymentDetails.hostName
-                sb.appendLine("• *$bank*: ${paymentDetails.bankAccountNumber} (a.n. $holder)")
-            }
-            if (!paymentDetails.eWalletHandle.isNullOrBlank()) {
-                val wallet = paymentDetails.eWalletName ?: "E-Wallet"
-                sb.appendLine("• *$wallet*: ${paymentDetails.eWalletHandle}")
-            }
-            if (!paymentDetails.customNote.isNullOrBlank()) {
-                sb.appendLine("• Note: ${paymentDetails.customNote}")
+            if (debtorTransactions.isNotEmpty()) {
+                sb.appendLine("💳 *Settlement Instructions (Who to Transfer to):*")
+                debtorTransactions.forEach { tx ->
+                    val isCreditorHost = isHostName(tx.creditorName, hostMemberName, paymentDetails)
+                    sb.appendLine()
+                    sb.appendLine("• Pay *${tx.creditorName}*: *${formatCents(tx.amountCents, currency)}*")
+                    if (isCreditorHost && paymentDetails != null) {
+                        if (!paymentDetails.bankAccountNumber.isNullOrBlank()) {
+                            val bank = paymentDetails.bankName ?: "Bank"
+                            val holder = if (!paymentDetails.accountHolderName.isNullOrBlank()) paymentDetails.accountHolderName else paymentDetails.hostName
+                            sb.appendLine("  - *$bank*: ${paymentDetails.bankAccountNumber} (a.n. $holder)")
+                        }
+                        if (!paymentDetails.eWalletHandle.isNullOrBlank()) {
+                            val wallet = paymentDetails.eWalletName ?: "E-Wallet"
+                            sb.appendLine("  - *$wallet*: ${paymentDetails.eWalletHandle}")
+                        }
+                        if (!paymentDetails.customNote.isNullOrBlank()) {
+                            sb.appendLine("  - Note: ${paymentDetails.customNote}")
+                        }
+                    } else {
+                        sb.appendLine("  - ℹ️ Please contact *${tx.creditorName}* directly for their Bank / E-Wallet transfer details.")
+                    }
+                }
+            } else if (paymentDetails != null) {
+                // If debtor owes the host directly
+                sb.appendLine("💳 *Please transfer to:*")
+                if (!paymentDetails.bankAccountNumber.isNullOrBlank()) {
+                    val bank = paymentDetails.bankName ?: "Bank"
+                    val holder = if (!paymentDetails.accountHolderName.isNullOrBlank()) paymentDetails.accountHolderName else paymentDetails.hostName
+                    sb.appendLine("• *$bank*: ${paymentDetails.bankAccountNumber} (a.n. $holder)")
+                }
+                if (!paymentDetails.eWalletHandle.isNullOrBlank()) {
+                    val wallet = paymentDetails.eWalletName ?: "E-Wallet"
+                    sb.appendLine("• *$wallet*: ${paymentDetails.eWalletHandle}")
+                }
+                if (!paymentDetails.customNote.isNullOrBlank()) {
+                    sb.appendLine("• Note: ${paymentDetails.customNote}")
+                }
             }
         }
 
