@@ -134,5 +134,67 @@ class BillSummaryFormatterTest {
         // Should NOT contain the host's bank account when Alice owes Itik!
         org.junit.Assert.assertFalse(message.contains("2450900365"))
     }
+
+    @Test
+    fun testFormatMemberOwesNonHostCreditorWithSavedBankDetails() {
+        val paymentDetails = HostPaymentDetails(
+            hostName = "Rowan",
+            bankName = "BCA",
+            accountHolderName = "Rowan",
+            bankAccountNumber = "2450900365"
+        )
+
+        val expense = Expense(
+            groupId = 1L,
+            title = "Dinner by Itik",
+            totalAmountCents = 30000000L,
+            currency = "IDR",
+            category = ExpenseCategory.FOOD,
+            paidByMemberId = 3L,
+            paidByMemberName = "Itik",
+            splitType = SplitType.EQUAL,
+            participants = listOf(
+                ExpenseParticipant(2L, "Alice", 10000000L)
+            )
+        )
+
+        val tx = com.babysplit.app.feature.balance.domain.engine.DebtSimplificationEngine.SimplifiedTransaction(
+            debtorId = 2L,
+            debtorName = "Alice",
+            creditorId = 3L,
+            creditorName = "Itik",
+            amountCents = 10000000L
+        )
+
+        val itikMember = com.babysplit.app.core.database.entity.MemberEntity(
+            id = 3L,
+            groupId = 1L,
+            name = "Itik",
+            bankName = "Bank Jago",
+            accountHolderName = "Itik Bebek",
+            bankAccountNumber = "1029384756",
+            eWalletHandle = "08198765432"
+        )
+
+        val message = BillSummaryFormatter.formatMemberWhatsAppMessage(
+            tripName = "Bali Trip",
+            memberName = "Alice",
+            memberExpenses = listOf(expense to 10000000L),
+            totalOwedCents = 10000000L,
+            currency = "IDR",
+            paymentDetails = paymentDetails,
+            debtorTransactions = listOf(tx),
+            creditorMembers = mapOf("Itik" to itikMember),
+            hostMemberName = "Rowan"
+        )
+
+        assertTrue(message.contains("Pay *Itik*"))
+        assertTrue(message.contains("Bank Jago"))
+        assertTrue(message.contains("1029384756"))
+        assertTrue(message.contains("Itik Bebek"))
+        assertTrue(message.contains("08198765432"))
+        // Should NOT contain host's BCA account
+        org.junit.Assert.assertFalse(message.contains("2450900365"))
+    }
 }
 

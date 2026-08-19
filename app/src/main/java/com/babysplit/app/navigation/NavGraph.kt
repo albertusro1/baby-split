@@ -103,7 +103,7 @@ fun NavGraph(
                 onAddExpenseClick = { gId ->
                     navController.navigate(Screen.AddEditExpense.createRoute(gId))
                 },
-                onAddMember = { name, type, email, phone ->
+                onAddMember = { name, type, email, phone, bankName, holderName, bankAcc, walletName, walletHandle ->
                     scope.launch {
                         database.memberDao().insertMember(
                             MemberEntity(
@@ -111,9 +111,19 @@ fun NavGraph(
                                 name = name,
                                 memberType = type,
                                 email = email,
-                                phoneNumber = phone
+                                phoneNumber = phone,
+                                bankName = bankName,
+                                accountHolderName = holderName,
+                                bankAccountNumber = bankAcc,
+                                eWalletName = walletName,
+                                eWalletHandle = walletHandle
                             )
                         )
+                    }
+                },
+                onUpdateMember = { updatedMember ->
+                    scope.launch {
+                        database.memberDao().updateMember(updatedMember)
                     }
                 },
                 onRecordSettlement = { payerId, receiverId, amountCents ->

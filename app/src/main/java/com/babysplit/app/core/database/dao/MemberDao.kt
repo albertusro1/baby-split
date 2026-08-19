@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.core.database.dao
+package com.babysplit.app.core.database.dao
 
 import androidx.room.*
 import com.babysplit.app.core.database.entity.MemberEntity
@@ -17,6 +17,9 @@ interface MemberDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMembers(members: List<MemberEntity>)
+
+    @Update
+    suspend fun updateMember(member: MemberEntity)
 
     @Delete
     suspend fun deleteMember(member: MemberEntity)

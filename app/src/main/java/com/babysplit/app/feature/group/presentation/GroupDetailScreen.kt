@@ -50,7 +50,8 @@ fun GroupDetailScreen(
     paymentDetails: HostPaymentDetails?,
     onBackClick: () -> Unit,
     onAddExpenseClick: (Long) -> Unit,
-    onAddMember: (name: String, type: String, email: String?, phone: String?) -> Unit,
+    onAddMember: (name: String, type: String, email: String?, phone: String?, bankName: String?, holderName: String?, bankAcc: String?, walletName: String?, walletHandle: String?) -> Unit,
+    onUpdateMember: (MemberEntity) -> Unit = {},
     onRecordSettlement: (paidByMemberId: Long, paidToMemberId: Long, amountCents: Long) -> Unit,
     onFinishTrip: () -> Unit
 ) {
@@ -64,6 +65,7 @@ fun GroupDetailScreen(
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddMemberDialog by remember { mutableStateOf(false) }
+    var editingPaymentMember by remember { mutableStateOf<MemberEntity?>(null) }
     var showSettlementDialog by remember { mutableStateOf(false) }
     var showFinishTripDialog by remember { mutableStateOf(false) }
 
@@ -144,15 +146,13 @@ fun GroupDetailScreen(
         },
         floatingActionButton = {
             if (selectedTab == 0 && !group.isFinished) {
-                ExtendedFloatingActionButton(
+                FloatingActionButton(
                     onClick = { onAddExpenseClick(group.id) },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White) },
-                    text = { Text("Add Expense", fontWeight = FontWeight.Bold, color = Color.White) },
                     containerColor = ChickAmber,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
-                )
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add Expense")
+                }
             }
         }
     ) { padding ->
@@ -230,7 +230,8 @@ fun GroupDetailScreen(
                     simplifiedTransactions = simplifiedTransactions,
                     expenses = expenses,
                     paymentDetails = paymentDetails,
-                    onSettleUpClick = { showSettlementDialog = true }
+                    onSettleUpClick = { showSettlementDialog = true },
+                    onEditMemberPayment = { editingPaymentMember = it }
                 )
                 2 -> TotalsTab(
                     currency = group.currency,
@@ -245,9 +246,20 @@ fun GroupDetailScreen(
     if (showAddMemberDialog) {
         AddMemberDialog(
             onDismiss = { showAddMemberDialog = false },
-            onConfirm = { name, type, email, phone ->
-                onAddMember(name, type.name, email, phone)
+            onConfirm = { name, type, email, phone, bankName, holderName, bankAcc, walletName, walletHandle ->
+                onAddMember(name, type.name, email, phone, bankName, holderName, bankAcc, walletName, walletHandle)
                 showAddMemberDialog = false
+            }
+        )
+    }
+
+    if (editingPaymentMember != null) {
+        EditMemberPaymentDialog(
+            member = editingPaymentMember!!,
+            onDismiss = { editingPaymentMember = null },
+            onConfirm = { updatedMember ->
+                onUpdateMember(updatedMember)
+                editingPaymentMember = null
             }
         )
     }
@@ -456,7 +468,8 @@ private fun BalancesTab(
     simplifiedTransactions: List<DebtSimplificationEngine.SimplifiedTransaction>,
     expenses: List<Expense>,
     paymentDetails: HostPaymentDetails?,
-    onSettleUpClick: () -> Unit
+    onSettleUpClick: () -> Unit,
+    onEditMemberPayment: (MemberEntity) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -555,6 +568,37 @@ private fun BalancesTab(
                             else -> TextSecondary
                         }
                         Text(statusText, fontSize = 13.sp, color = statusColor, fontWeight = FontWeight.SemiBold)
+
+                        // If member is owed money (creditor), show bank info chip with quick-edit
+                        if (balance.netBalanceCents > 0 && member != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val hasBank = !member.bankAccountNumber.isNullOrBlank() || !member.eWalletHandle.isNullOrBlank()
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (hasBank) ChickYellowSubtle else BackgroundLight,
+                                border = BorderStroke(1.dp, if (hasBank) ChickGold else SurfaceBorderLight),
+                                modifier = Modifier.clickable { onEditMemberPayment(member) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Filled.AccountBalance, contentDescription = null, tint = ChickAmber, modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (hasBank) {
+                                            val bankText = if (!member.bankAccountNumber.isNullOrBlank()) "${member.bankName ?: "Bank"}: ${member.bankAccountNumber}" else member.eWalletHandle ?: ""
+                                            "💳 $bankText ✏️"
+                                        } else {
+                                            "+ Add Bank / QRIS ✏️"
+                                        },
+                                        fontSize = 11.sp,
+                                        color = if (hasBank) Color(0xFF7A4F00) else TextSecondary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     // Explicit Labeled Member WhatsApp Breakdown Share
@@ -566,6 +610,7 @@ private fun BalancesTab(
                                 if (part != null) memberExpenses.add(exp to part.amountCents)
                             }
                             val debtorTxs = simplifiedTransactions.filter { it.debtorId == balance.memberId }
+                            val creditorMap = members.associateBy { it.name }
                             val msg = BillSummaryFormatter.formatMemberWhatsAppMessage(
                                 tripName = groupName,
                                 memberName = balance.memberName,
@@ -574,6 +619,7 @@ private fun BalancesTab(
                                 currency = currency,
                                 paymentDetails = paymentDetails,
                                 debtorTransactions = debtorTxs,
+                                creditorMembers = creditorMap,
                                 hostMemberName = paymentDetails?.hostName ?: "Host"
                             )
                             WhatsAppShareHelper.shareToWhatsApp(context, msg, member?.phoneNumber)
@@ -687,5 +733,98 @@ private fun TotalsTab(
         }
         item { Spacer(modifier = Modifier.height(40.dp)) }
     }
+}
+
+@Composable
+fun EditMemberPaymentDialog(
+    member: MemberEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (MemberEntity) -> Unit
+) {
+    var bankName by remember(member) { mutableStateOf(member.bankName ?: "") }
+    var holderName by remember(member) { mutableStateOf(member.accountHolderName ?: member.name) }
+    var bankAcc by remember(member) { mutableStateOf(member.bankAccountNumber ?: "") }
+    var walletHandle by remember(member) { mutableStateOf(member.eWalletHandle ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceLight,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Text("Edit ${member.name}'s Payment Info 💳", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "When other friends owe ${member.name}, these details will be automatically attached to their WhatsApp bills:",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+                OutlinedTextField(
+                    value = bankName,
+                    onValueChange = { bankName = it },
+                    label = { Text("Bank Name") },
+                    placeholder = { Text("e.g. BCA, Mandiri, BRI") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = holderName,
+                    onValueChange = { holderName = it },
+                    label = { Text("Account Holder Name") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = bankAcc,
+                    onValueChange = { bankAcc = it },
+                    label = { Text("Bank Account Number") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = walletHandle,
+                    onValueChange = { walletHandle = it },
+                    label = { Text("E-Wallet / QRIS (Optional)") },
+                    placeholder = { Text("e.g. GoPay: 0812-3456-7890") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm(
+                        member.copy(
+                            bankName = bankName.ifBlank { null },
+                            accountHolderName = holderName.ifBlank { null },
+                            bankAccountNumber = bankAcc.ifBlank { null },
+                            eWalletHandle = walletHandle.ifBlank { null }
+                        )
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Save Details 💾", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondary)
+            }
+        }
+    )
 }
 

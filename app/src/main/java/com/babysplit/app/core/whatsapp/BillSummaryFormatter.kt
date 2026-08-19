@@ -51,7 +51,7 @@ object BillSummaryFormatter {
 
     /**
      * Formats an itemized breakdown for a specific member in WhatsApp Markdown.
-     * Only displays host bank details if the creditor is actually the host.
+     * Only displays host bank details if the creditor is actually the host, or the creditor's bank details if saved.
      */
     fun formatMemberWhatsAppMessage(
         tripName: String,
@@ -61,6 +61,7 @@ object BillSummaryFormatter {
         currency: String,
         paymentDetails: HostPaymentDetails?,
         debtorTransactions: List<DebtSimplificationEngine.SimplifiedTransaction> = emptyList(),
+        creditorMembers: Map<String, com.babysplit.app.core.database.entity.MemberEntity> = emptyMap(),
         hostMemberName: String? = null
     ): String {
         val sb = StringBuilder()
@@ -94,6 +95,7 @@ object BillSummaryFormatter {
                 sb.appendLine("💳 *Settlement Instructions (Who to Transfer to):*")
                 debtorTransactions.forEach { tx ->
                     val isCreditorHost = isHostName(tx.creditorName, hostMemberName, paymentDetails)
+                    val creditorMember = creditorMembers[tx.creditorName]
                     sb.appendLine()
                     sb.appendLine("• Pay *${tx.creditorName}*: *${formatCents(tx.amountCents, currency)}*")
                     if (isCreditorHost && paymentDetails != null) {
@@ -108,6 +110,16 @@ object BillSummaryFormatter {
                         }
                         if (!paymentDetails.customNote.isNullOrBlank()) {
                             sb.appendLine("  - Note: ${paymentDetails.customNote}")
+                        }
+                    } else if (creditorMember != null && (!creditorMember.bankAccountNumber.isNullOrBlank() || !creditorMember.eWalletHandle.isNullOrBlank())) {
+                        if (!creditorMember.bankAccountNumber.isNullOrBlank()) {
+                            val bank = creditorMember.bankName ?: "Bank"
+                            val holder = if (!creditorMember.accountHolderName.isNullOrBlank()) creditorMember.accountHolderName else creditorMember.name
+                            sb.appendLine("  - *$bank*: ${creditorMember.bankAccountNumber} (a.n. $holder)")
+                        }
+                        if (!creditorMember.eWalletHandle.isNullOrBlank()) {
+                            val wallet = creditorMember.eWalletName ?: "E-Wallet"
+                            sb.appendLine("  - *$wallet*: ${creditorMember.eWalletHandle}")
                         }
                     } else {
                         sb.appendLine("  - ℹ️ Please contact *${tx.creditorName}* directly for their Bank / E-Wallet transfer details.")

@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.core.database
+package com.babysplit.app.core.database
 
 import android.content.Context
 import androidx.room.Database
@@ -18,7 +18,7 @@ import com.babysplit.app.core.database.entity.*
         ExpenseParticipantEntity::class,
         CachedCurrencyRateEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class BabySplitDatabase : RoomDatabase() {
@@ -36,7 +36,9 @@ abstract class BabySplitDatabase : RoomDatabase() {
                     context.applicationContext,
                     BabySplitDatabase::class.java,
                     "babysplit_database.db"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

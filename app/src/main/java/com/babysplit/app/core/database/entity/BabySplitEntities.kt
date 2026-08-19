@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.core.database.entity
+package com.babysplit.app.core.database.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -29,10 +29,15 @@ data class MemberEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val groupId: Long,
     val name: String,
-    val memberType: String = "OFFLINE_TAGGED", // HOST, OFFLINE_TAGGED, GMAIL_INVITED
+    val memberType: String = "OFFLINE_TAGGED", // HOST, OFFLINE_TAGGED
     val email: String? = null,
     val phoneNumber: String? = null,
-    val avatarColorHex: String = "#3F51B5"
+    val avatarColorHex: String = "#3F51B5",
+    val bankName: String? = null,
+    val accountHolderName: String? = null,
+    val bankAccountNumber: String? = null,
+    val eWalletName: String? = null,
+    val eWalletHandle: String? = null
 )
 
 @Entity(tableName = "expenses")
