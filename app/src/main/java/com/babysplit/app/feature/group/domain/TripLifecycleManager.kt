@@ -2,7 +2,6 @@ package com.babysplit.app.feature.group.domain
 
 import android.content.Context
 import com.babysplit.app.core.database.BabySplitDatabase
-import com.babysplit.app.core.gdrive.GoogleDriveBackupEngine
 import com.babysplit.app.core.whatsapp.HostPaymentDetails
 import com.babysplit.app.feature.expense.domain.model.Expense
 import com.babysplit.app.feature.expense.domain.model.ExpenseCategory
@@ -54,10 +53,6 @@ class TripLifecycleManager(private val database: BabySplitDatabase) {
 
         // 1. Mark group as finished in DB
         database.groupDao().updateGroup(group.copy(isFinished = true))
-
-        // 2. Backup full trip snapshot to persistent external and cloud locations
-        GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
-
         true
     }
 }

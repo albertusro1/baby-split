@@ -142,17 +142,6 @@ fun DashboardScreen(
                                     color = TextSecondary,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                OutlinedButton(
-                                    onClick = { dashboardDocumentPicker.launch(arrayOf("application/json", "*/*")) },
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = BorderStroke(1.dp, ChickGold),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ChickAmber)
-                                ) {
-                                    Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("📂 Import Backup File (.json)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                }
                             }
                         }
                     }
