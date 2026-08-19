@@ -8,6 +8,7 @@ import com.babysplit.app.core.database.entity.ExpenseParticipantEntity
 import com.babysplit.app.core.database.entity.GroupEntity
 import com.babysplit.app.core.database.entity.MemberEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject

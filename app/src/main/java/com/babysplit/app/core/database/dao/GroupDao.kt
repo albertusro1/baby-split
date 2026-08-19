@@ -9,6 +9,9 @@ interface GroupDao {
     @Query("SELECT * FROM groups ORDER BY createdAtEpochMs DESC")
     fun getAllGroups(): Flow<List<GroupEntity>>
 
+    @Query("SELECT * FROM groups")
+    suspend fun getAllGroupsDirect(): List<GroupEntity>
+
     @Query("SELECT * FROM groups WHERE id = :groupId")
     fun getGroupById(groupId: Long): Flow<GroupEntity?>
 
