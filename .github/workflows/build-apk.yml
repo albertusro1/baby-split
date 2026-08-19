@@ -34,11 +34,16 @@ jobs:
       - name: Run Unit Tests
         run: ./gradlew testDebugUnitTest --stacktrace --no-daemon
 
+      - name: Prepare APK Artifact
+        run: |
+          mkdir -p build-output
+          find app/build/outputs/apk -type f -name "*.apk" -exec cp {} build-output/baby-split.apk \;
+
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: BabySplit-Debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: baby-split
+          path: build-output/baby-split.apk
           if-no-files-found: error
           retention-days: 30
 
