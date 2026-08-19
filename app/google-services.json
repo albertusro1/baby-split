@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "102850592829",
+    "project_id": "baby-split",
+    "storage_bucket": "baby-split.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:102850592829:android:eaee886ddfcded0d49aa54",
+        "android_client_info": {
+          "package_name": "com.babysplit.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHNQfpUrLAn4kAf-hrwKHsddRnrNOTMqg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

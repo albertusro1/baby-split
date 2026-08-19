@@ -27,6 +27,7 @@ fun DashboardScreen(
     groups: List<GroupEntity>,
     onGroupClick: (Long) -> Unit,
     onCreateGroupClick: () -> Unit,
+    onJoinTripClick: () -> Unit = {},
     onProfileClick: () -> Unit,
     onDeleteGroup: (Long) -> Unit = {},
     onRestoreDiscoveredBackups: (List<com.babysplit.app.core.gdrive.DriveBackupItem>) -> Unit = {}
@@ -65,7 +66,7 @@ fun DashboardScreen(
                         android.widget.Toast.makeText(context, "Restored trip '$name' successfully! 🎉", android.widget.Toast.LENGTH_LONG).show()
                     }
                 } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, "Failed to import backup: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                    android.widget.Toast.makeText(context, "Failed to import trip: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -135,6 +136,16 @@ fun DashboardScreen(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
+                    OutlinedButton(
+                        onClick = onJoinTripClick,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        border = BorderStroke(1.dp, ChickAmber)
+                    ) {
+                        Icon(Icons.Filled.Link, contentDescription = null, tint = ChickAmber, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Join by Code", fontSize = 12.sp, color = ChickAmber, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 

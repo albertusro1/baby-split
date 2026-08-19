@@ -2,6 +2,7 @@ package com.babysplit.app.navigation
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -14,13 +15,78 @@ import com.babysplit.app.core.database.entity.ExpenseEntity
 import com.babysplit.app.core.database.entity.ExpenseParticipantEntity
 import com.babysplit.app.core.database.entity.GroupEntity
 import com.babysplit.app.core.database.entity.MemberEntity
+import com.babysplit.app.core.repository.ExpenseData
+import com.babysplit.app.core.repository.MemberData
+import com.babysplit.app.core.repository.ParticipantData
+import com.babysplit.app.core.repository.TripData
 import com.babysplit.app.feature.dashboard.presentation.DashboardScreen
+import com.babysplit.app.feature.dashboard.presentation.DashboardViewModel
+import com.babysplit.app.feature.dashboard.presentation.JoinTripResult
+import com.babysplit.app.feature.expense.domain.model.Expense
+import com.babysplit.app.feature.expense.domain.model.ExpenseCategory
+import com.babysplit.app.feature.expense.domain.model.SplitType
 import com.babysplit.app.feature.expense.presentation.AddEditExpenseScreen
-import com.babysplit.app.feature.group.domain.TripLifecycleManager
 import com.babysplit.app.feature.group.presentation.CreateGroupDialog
 import com.babysplit.app.feature.group.presentation.GroupDetailScreen
+import com.babysplit.app.feature.group.presentation.GroupDetailViewModel
+import com.babysplit.app.feature.group.presentation.JoinTripDialog
 import com.babysplit.app.feature.profile.presentation.ProfileScreen
+import com.babysplit.app.feature.profile.presentation.ProfileViewModel
 import kotlinx.coroutines.launch
+
+// ── Bridge Helpers: Convert domain models to Room entities for existing screens ──
+
+private fun TripData.toGroupEntity() = GroupEntity(
+    id = id.toLongOrNull() ?: 0L,
+    name = name,
+    currency = currency,
+    emoji = emoji,
+    simplifyDebts = simplifyDebts,
+    isFinished = isFinished,
+    createdAtEpochMs = createdAtEpochMs
+)
+
+private fun MemberData.toMemberEntity() = MemberEntity(
+    id = id.toLongOrNull() ?: 0L,
+    groupId = tripId.toLongOrNull() ?: 0L,
+    name = name,
+    memberType = memberType,
+    email = email,
+    phoneNumber = phoneNumber,
+    avatarColorHex = avatarColorHex,
+    bankName = bankName,
+    accountHolderName = accountHolderName,
+    bankAccountNumber = bankAccountNumber,
+    eWalletName = eWalletName,
+    eWalletHandle = eWalletHandle
+)
+
+private fun ExpenseData.toExpenseWithParticipants() = ExpenseWithParticipants(
+    expense = ExpenseEntity(
+        id = id,
+        groupId = tripId.toLongOrNull() ?: 0L,
+        title = title,
+        totalAmountCents = totalAmountCents,
+        currency = currency,
+        categoryName = categoryName,
+        paidByMemberId = paidByMemberId.toLongOrNull() ?: 0L,
+        paidByMemberName = paidByMemberName,
+        splitType = splitType,
+        receiptImagePath = receiptImagePath,
+        note = note,
+        createdAtEpochMs = createdAtEpochMs,
+        isSettlement = isSettlement
+    ),
+    participants = participants.map {
+        ExpenseParticipantEntity(
+            expenseId = id,
+            memberId = it.memberId.toLongOrNull() ?: 0L,
+            memberName = it.memberName,
+            amountCents = it.amountCents,
+            rawShareValue = it.rawShareValue
+        )
+    }
+)
 
 @Composable
 fun NavGraph(
@@ -29,39 +95,62 @@ fun NavGraph(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val database = app.database
     val userPrefs = app.userPreferences
-    val tripLifecycleManager = remember { TripLifecycleManager(database) }
 
-    val groups by database.groupDao().getAllGroups().collectAsState(initial = emptyList())
     val paymentDetails by userPrefs.hostPaymentDetailsFlow.collectAsState(initial = null)
     val defaultCurrency by userPrefs.defaultCurrencyFlow.collectAsState(initial = "USD")
-    val userEmail by userPrefs.userEmailFlow.collectAsState(initial = null)
     val userName by userPrefs.userNameFlow.collectAsState(initial = "Guest")
 
+    // Shared DashboardViewModel – holds auth state and active repository
+    val dashboardViewModel: DashboardViewModel = viewModel()
+    val dashboardState by dashboardViewModel.uiState.collectAsState()
+
     var showCreateGroupDialog by remember { mutableStateOf(false) }
+    var showJoinTripDialog by remember { mutableStateOf(false) }
+
+    // Handle join trip results
+    LaunchedEffect(dashboardState.joinTripResult) {
+        when (val result = dashboardState.joinTripResult) {
+            is JoinTripResult.Success -> {
+                navController.navigate(Screen.GroupDetail.createRoute(result.tripId))
+                dashboardViewModel.clearJoinTripResult()
+            }
+            is JoinTripResult.Error -> {
+                // Error is shown in UI via dashboardState
+            }
+            null -> {}
+        }
+    }
 
     NavHost(
         navController = navController,
         startDestination = Screen.Dashboard.route
     ) {
         composable(Screen.Dashboard.route) {
+            // Convert TripData to GroupEntity for existing DashboardScreen
+            val groupEntities = dashboardState.trips.map { it.toGroupEntity() }
+
             DashboardScreen(
-                groups = groups,
+                groups = groupEntities,
                 onGroupClick = { groupId ->
-                    navController.navigate(Screen.GroupDetail.createRoute(groupId))
+                    // Find the corresponding TripData to get its string ID
+                    val trip = dashboardState.trips.find { it.id.toLongOrNull() == groupId || it.id == groupId.toString() }
+                    val tripId = trip?.id ?: groupId.toString()
+                    navController.navigate(Screen.GroupDetail.createRoute(tripId))
                 },
                 onCreateGroupClick = { showCreateGroupDialog = true },
+                onJoinTripClick = { showJoinTripDialog = true },
                 onProfileClick = { navController.navigate(Screen.Profile.route) },
-                onDeleteGroup = { gId ->
-                    scope.launch {
-                        database.groupDao().deleteFullGroup(gId)
+                onDeleteGroup = { groupId ->
+                    val trip = dashboardState.trips.find { it.id.toLongOrNull() == groupId || it.id == groupId.toString() }
+                    if (trip != null) {
+                        dashboardViewModel.deleteTrip(trip.id)
                     }
                 },
                 onRestoreDiscoveredBackups = { backups ->
                     scope.launch {
                         for (backup in backups) {
-                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(database, backup)
+                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(app.database, backup)
                         }
                     }
                 }
@@ -71,32 +160,31 @@ fun NavGraph(
                 CreateGroupDialog(
                     onDismiss = { showCreateGroupDialog = false },
                     onConfirm = { name, emoji, currency, simplifyDebts ->
-                        scope.launch {
-                            val groupId = database.groupDao().insertGroup(
-                                GroupEntity(
-                                    name = name,
-                                    currency = currency,
-                                    emoji = emoji,
-                                    simplifyDebts = simplifyDebts
-                                )
-                            )
-                            // Add host as the first member with current payment details
-                            database.memberDao().insertMember(
-                                MemberEntity(
-                                    groupId = groupId,
-                                    name = "You (Host)",
-                                    memberType = "HOST",
-                                    bankName = paymentDetails?.bankName,
-                                    accountHolderName = paymentDetails?.accountHolderName ?: userName,
-                                    bankAccountNumber = paymentDetails?.bankAccountNumber,
-                                    eWalletName = paymentDetails?.eWalletName,
-                                    eWalletHandle = paymentDetails?.eWalletHandle
-                                )
-                            )
-                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
+                        dashboardViewModel.createTrip(
+                            name = name,
+                            emoji = emoji,
+                            currency = currency,
+                            simplifyDebts = simplifyDebts,
+                            hostName = userName.ifBlank { "You (Host)" },
+                            hostBankName = paymentDetails?.bankName,
+                            hostAccountHolderName = paymentDetails?.accountHolderName ?: userName,
+                            hostBankAccountNumber = paymentDetails?.bankAccountNumber,
+                            hostEWalletName = paymentDetails?.eWalletName,
+                            hostEWalletHandle = paymentDetails?.eWalletHandle
+                        ) { tripId ->
                             showCreateGroupDialog = false
-                            navController.navigate(Screen.GroupDetail.createRoute(groupId))
+                            navController.navigate(Screen.GroupDetail.createRoute(tripId))
                         }
+                    }
+                )
+            }
+
+            if (showJoinTripDialog) {
+                JoinTripDialog(
+                    onDismiss = { showJoinTripDialog = false },
+                    onJoin = { code ->
+                        dashboardViewModel.joinTripByCode(code)
+                        showJoinTripDialog = false
                     }
                 )
             }
@@ -104,104 +192,109 @@ fun NavGraph(
 
         composable(
             route = Screen.GroupDetail.route,
-            arguments = listOf(navArgument("groupId") { type = NavType.LongType })
+            arguments = listOf(navArgument("tripId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val groupId = backStackEntry.arguments?.getLong("groupId") ?: 0L
-            val group by database.groupDao().getGroupById(groupId).collectAsState(initial = null)
-            val members by database.memberDao().getMembersForGroup(groupId).collectAsState(initial = emptyList())
-            val expensesWithParticipants by database.expenseDao().getExpensesWithParticipants(groupId).collectAsState(initial = emptyList())
+            val tripId = backStackEntry.arguments?.getString("tripId") ?: ""
+            val activeRepo = dashboardViewModel.activeRepository
+            val currentUserId = dashboardViewModel.authRepository.getCurrentUser()?.uid ?: ""
+
+            val groupDetailViewModel = remember(tripId) {
+                GroupDetailViewModel(
+                    tripId = tripId,
+                    repository = activeRepo,
+                    currentUserId = currentUserId
+                )
+            }
+            val groupState by groupDetailViewModel.uiState.collectAsState()
+
+            // Bridge: Convert domain models to Room entities for GroupDetailScreen
+            val groupEntity = groupState.trip?.toGroupEntity()
+            val memberEntities = groupState.members.map { it.toMemberEntity() }
+            val expenseEntities = groupState.expenses.map { it.toExpenseWithParticipants() }
+
+            var showInviteSheet by remember { mutableStateOf(false) }
 
             GroupDetailScreen(
-                group = group,
-                members = members,
-                expensesWithParticipants = expensesWithParticipants,
+                group = groupEntity,
+                members = memberEntities,
+                expensesWithParticipants = expenseEntities,
                 paymentDetails = paymentDetails,
                 onBackClick = { navController.popBackStack() },
-                onAddExpenseClick = { gId ->
-                    navController.navigate(Screen.AddEditExpense.createRoute(gId))
+                onAddExpenseClick = { _ ->
+                    navController.navigate(Screen.AddEditExpense.createRoute(tripId))
                 },
                 onAddMember = { name, type, email, phone, bankName, holderName, bankAcc, walletName, walletHandle ->
-                    scope.launch {
-                        database.memberDao().insertMember(
-                            MemberEntity(
-                                groupId = groupId,
-                                name = name,
-                                memberType = type,
-                                email = email,
-                                phoneNumber = phone,
-                                bankName = bankName,
-                                accountHolderName = holderName,
-                                bankAccountNumber = bankAcc,
-                                eWalletName = walletName,
-                                eWalletHandle = walletHandle
-                            )
-                        )
-                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
-                    }
+                    groupDetailViewModel.addMember(
+                        name = name,
+                        memberType = type,
+                        email = email,
+                        phoneNumber = phone,
+                        bankName = bankName,
+                        accountHolderName = holderName,
+                        bankAccountNumber = bankAcc,
+                        eWalletName = walletName,
+                        eWalletHandle = walletHandle
+                    )
                 },
-                onUpdateMember = { updatedMember ->
-                    scope.launch {
-                        database.memberDao().updateMember(updatedMember)
-                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, updatedMember.groupId)
-                    }
+                onUpdateMember = { memberEntity ->
+                    // Convert MemberEntity back to MemberData
+                    val memberData = MemberData(
+                        id = memberEntity.id.toString(),
+                        tripId = tripId,
+                        name = memberEntity.name,
+                        memberType = memberEntity.memberType,
+                        email = memberEntity.email,
+                        phoneNumber = memberEntity.phoneNumber,
+                        avatarColorHex = memberEntity.avatarColorHex,
+                        bankName = memberEntity.bankName,
+                        accountHolderName = memberEntity.accountHolderName,
+                        bankAccountNumber = memberEntity.bankAccountNumber,
+                        eWalletName = memberEntity.eWalletName,
+                        eWalletHandle = memberEntity.eWalletHandle
+                    )
+                    groupDetailViewModel.updateMember(memberData)
                 },
                 onRecordSettlement = { payerId, receiverId, amountCents ->
-                    scope.launch {
-                        val payer = members.firstOrNull { it.id == payerId }?.name ?: "Payer"
-                        val receiver = members.firstOrNull { it.id == receiverId }?.name ?: "Receiver"
-                        val expId = java.util.UUID.randomUUID().toString()
-
-                        database.expenseDao().insertFullExpense(
-                            expense = ExpenseEntity(
-                                id = expId,
-                                groupId = groupId,
-                                title = "Payment: $payer ➔ $receiver",
-                                totalAmountCents = amountCents,
-                                currency = group?.currency ?: "USD",
-                                categoryName = "SETTLEMENT",
-                                paidByMemberId = payerId,
-                                paidByMemberName = payer,
-                                isSettlement = true
-                            ),
-                            participants = listOf(
-                                ExpenseParticipantEntity(
-                                    expenseId = expId,
-                                    memberId = receiverId,
-                                    memberName = receiver,
-                                    amountCents = amountCents
-                                )
-                            )
-                        )
-                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
-                    }
+                    // Convert Long IDs to String for the ViewModel
+                    groupDetailViewModel.recordSettlement(
+                        payerMemberId = payerId.toString(),
+                        receiverMemberId = receiverId.toString(),
+                        amountCents = amountCents
+                    )
                 },
-                onFinishTrip = {
-                    scope.launch {
-                        tripLifecycleManager.finishTrip(context, groupId, paymentDetails)
-                    }
-                },
+                onFinishTrip = { groupDetailViewModel.finishTrip() },
                 onDeleteTrip = {
-                    scope.launch {
-                        database.groupDao().deleteFullGroup(groupId)
+                    groupDetailViewModel.deleteTrip {
                         navController.popBackStack()
                     }
                 },
-                onEditExpense = { gId, expId ->
-                    navController.navigate(Screen.AddEditExpense.createRoute(gId, expId))
+                onEditExpense = { _, expId ->
+                    navController.navigate(Screen.AddEditExpense.createRoute(tripId, expId))
                 },
                 onDeleteExpense = { expId ->
-                    scope.launch {
-                        database.expenseDao().deleteFullExpense(expId)
-                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
+                    groupDetailViewModel.deleteExpense(expId)
+                },
+                onInviteClick = {
+                    if (groupState.inviteCode.isBlank()) {
+                        groupDetailViewModel.refreshInviteCode()
                     }
+                    showInviteSheet = true
                 }
             )
+
+            if (showInviteSheet) {
+                com.babysplit.app.feature.members.presentation.InviteMembersSheet(
+                    inviteCode = groupState.inviteCode.ifBlank { "TRIP-$tripId" },
+                    tripName = groupState.trip?.name ?: "Trip",
+                    onDismiss = { showInviteSheet = false }
+                )
+            }
         }
 
         composable(
             route = Screen.AddEditExpense.route,
             arguments = listOf(
-                navArgument("groupId") { type = NavType.LongType },
+                navArgument("tripId") { type = NavType.StringType },
                 navArgument("expenseId") {
                     type = NavType.StringType
                     nullable = true
@@ -209,60 +302,68 @@ fun NavGraph(
                 }
             )
         ) { backStackEntry ->
-            val groupId = backStackEntry.arguments?.getLong("groupId") ?: 0L
+            val tripId = backStackEntry.arguments?.getString("tripId") ?: ""
             val expenseId = backStackEntry.arguments?.getString("expenseId")
-            val group by database.groupDao().getGroupById(groupId).collectAsState(initial = null)
-            val members by database.memberDao().getMembersForGroup(groupId).collectAsState(initial = emptyList())
+            val activeRepo = dashboardViewModel.activeRepository
+
+            // Use the repository to get live data
+            val members by activeRepo.getMembersStream(tripId).collectAsState(initial = emptyList())
+            val trip by activeRepo.getTripStream(tripId).collectAsState(initial = null)
+
             var existingExpense by remember { mutableStateOf<ExpenseWithParticipants?>(null) }
 
             LaunchedEffect(expenseId) {
                 if (!expenseId.isNullOrBlank()) {
-                    existingExpense = database.expenseDao().getExpenseWithParticipantsDirect(expenseId)
+                    val expenseData = activeRepo.getExpenseById(tripId, expenseId)
+                    existingExpense = expenseData?.toExpenseWithParticipants()
                 }
             }
 
+            // Bridge: Convert MemberData to MemberEntity for AddEditExpenseScreen
+            val memberEntities = members.map { it.toMemberEntity() }
+
             AddEditExpenseScreen(
-                groupId = groupId,
-                currency = group?.currency ?: "USD",
-                members = members,
+                groupId = tripId.toLongOrNull() ?: 0L,
+                currency = trip?.currency ?: defaultCurrency,
+                members = memberEntities,
                 existingExpense = existingExpense,
                 onBackClick = { navController.popBackStack() },
                 onDeleteExpense = { expId ->
                     scope.launch {
-                        database.expenseDao().deleteFullExpense(expId)
-                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
+                        activeRepo.deleteExpense(tripId, expId)
                         navController.popBackStack()
                     }
                 },
                 onSaveExpense = { expense ->
                     scope.launch {
-                        database.expenseDao().insertFullExpense(
-                            expense = ExpenseEntity(
-                                id = expense.id,
-                                groupId = expense.groupId,
-                                title = expense.title,
-                                totalAmountCents = expense.totalAmountCents,
-                                currency = expense.currency,
-                                categoryName = expense.category.name,
-                                paidByMemberId = expense.paidByMemberId,
-                                paidByMemberName = expense.paidByMemberName,
-                                splitType = expense.splitType.name,
-                                receiptImagePath = expense.receiptImagePath,
-                                note = expense.note,
-                                createdAtEpochMs = expense.createdAtEpochMs,
-                                isSettlement = expense.isSettlement
-                            ),
+                        val expenseData = ExpenseData(
+                            id = expense.id,
+                            tripId = tripId,
+                            title = expense.title,
+                            totalAmountCents = expense.totalAmountCents,
+                            currency = expense.currency,
+                            categoryName = expense.category.name,
+                            paidByMemberId = expense.paidByMemberId.toString(),
+                            paidByMemberName = expense.paidByMemberName,
+                            splitType = expense.splitType.name,
+                            receiptImagePath = expense.receiptImagePath,
+                            note = expense.note,
+                            createdAtEpochMs = expense.createdAtEpochMs,
+                            isSettlement = expense.isSettlement,
                             participants = expense.participants.map {
-                                ExpenseParticipantEntity(
-                                    expenseId = expense.id,
-                                    memberId = it.memberId,
+                                ParticipantData(
+                                    memberId = it.memberId.toString(),
                                     memberName = it.memberName,
                                     amountCents = it.amountCents,
                                     rawShareValue = it.rawShareValue
                                 )
                             }
                         )
-                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
+                        if (expenseId.isNullOrBlank()) {
+                            activeRepo.addExpense(tripId, expenseData)
+                        } else {
+                            activeRepo.updateExpense(tripId, expenseData)
+                        }
                         navController.popBackStack()
                     }
                 }
@@ -270,37 +371,28 @@ fun NavGraph(
         }
 
         composable(Screen.Profile.route) {
+            val profileViewModel: ProfileViewModel = viewModel()
+            val profileState by profileViewModel.uiState.collectAsState()
+
             ProfileScreen(
                 currentPaymentDetails = paymentDetails,
                 currentCurrency = defaultCurrency,
+                userName = profileState.userName,
+                userEmail = profileState.userEmail,
+                isSignedIn = profileState.isSignedIn,
+                onSignInClick = {
+                    val clientId = context.getString(com.babysplit.app.R.string.default_web_client_id)
+                    profileViewModel.signInWithGoogle(clientId)
+                },
+                onSignOutClick = { profileViewModel.signOut() },
                 onBackClick = { navController.popBackStack() },
                 onSavePaymentDetails = { bank, holder, account, wallet, handle, note, curr ->
-                    scope.launch {
-                        userPrefs.savePaymentDetails(bank, holder, account, wallet, handle, note, curr)
-                        val allGroups = database.groupDao().getAllGroupsDirect()
-                        for (g in allGroups) {
-                            val members = database.memberDao().getMembersForGroupDirect(g.id)
-                            for (m in members) {
-                                if (m.memberType == "HOST" || m.name.contains("Host", ignoreCase = true) || m.name.contains("You", ignoreCase = true)) {
-                                    database.memberDao().updateMember(
-                                        m.copy(
-                                            bankName = bank,
-                                            accountHolderName = holder ?: m.accountHolderName,
-                                            bankAccountNumber = account,
-                                            eWalletName = wallet,
-                                            eWalletHandle = handle
-                                        )
-                                    )
-                                }
-                            }
-                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, g.id)
-                        }
-                    }
+                    profileViewModel.savePaymentDetails(bank, holder, account, wallet, handle, note, curr)
                 },
                 onRestoreBackups = { backups ->
                     scope.launch {
                         for (backup in backups) {
-                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(database, backup)
+                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(app.database, backup)
                         }
                     }
                 }

@@ -60,7 +60,8 @@ fun GroupDetailScreen(
     onFinishTrip: () -> Unit,
     onDeleteTrip: () -> Unit = {},
     onEditExpense: (groupId: Long, expenseId: String) -> Unit = { _, _ -> },
-    onDeleteExpense: (expenseId: String) -> Unit = {}
+    onDeleteExpense: (expenseId: String) -> Unit = {},
+    onInviteClick: () -> Unit = {}
 ) {
     if (group == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -140,6 +141,9 @@ fun GroupDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onInviteClick) {
+                        Icon(Icons.Filled.GroupAdd, contentDescription = "Invite Members", tint = ChickAmber)
+                    }
                     IconButton(onClick = { showAddMemberDialog = true }) {
                         Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member", tint = ChickAmber)
                     }

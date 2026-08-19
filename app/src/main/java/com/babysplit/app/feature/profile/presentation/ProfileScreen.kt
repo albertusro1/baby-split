@@ -26,6 +26,11 @@ import kotlinx.coroutines.launch
 fun ProfileScreen(
     currentPaymentDetails: HostPaymentDetails?,
     currentCurrency: String,
+    userName: String = "Guest",
+    userEmail: String? = null,
+    isSignedIn: Boolean = false,
+    onSignInClick: () -> Unit = {},
+    onSignOutClick: () -> Unit = {},
     onBackClick: () -> Unit,
     onSavePaymentDetails: (bank: String?, holder: String?, account: String?, wallet: String?, handle: String?, note: String?, currency: String) -> Unit,
     onRestoreBackups: (List<com.babysplit.app.core.gdrive.DriveBackupItem>) -> Unit = {}
@@ -105,6 +110,78 @@ fun ProfileScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // 0. ☁️ Google Account & Live Cloud Sync Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                    border = BorderStroke(1.dp, if (isSignedIn) ChickGold else SurfaceBorderLight)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("☁️ Google Account & Sync", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
+                            if (isSignedIn) {
+                                Surface(
+                                    color = Color(0xFFE8F5E9),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        "🟢 Synced",
+                                        color = Color(0xFF2E7D32),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (isSignedIn && !userEmail.isNullOrBlank()) {
+                            Text(
+                                "Linked Account: $userEmail",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextPrimary
+                            )
+                            Text(
+                                "Live collaborative editing and real-time syncing is active across all trip members.",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                            OutlinedButton(
+                                onClick = onSignOutClick,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Sign Out", fontSize = 13.sp)
+                            }
+                        } else {
+                            Text(
+                                "Sign in with Google to enable real-time collaboration with your friends and automatic cloud backups for all your trips.",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                            Button(
+                                onClick = onSignInClick,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ChickAmber)
+                            ) {
+                                Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Sign In with Google", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
             // 1. 💾 Offline Data Backup & Restore Card
             item {
                 Card(
