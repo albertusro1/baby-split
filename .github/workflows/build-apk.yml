@@ -1,4 +1,4 @@
-﻿name: Build Android APK
+name: Build Android APK
 
 on:
   push:
@@ -26,11 +26,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run Unit Tests
-        run: ./gradlew test
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build Debug APK & Run Tests
+        run: ./gradlew testDebugUnitTest assembleDebug --stacktrace --no-daemon
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -38,3 +35,4 @@ jobs:
           name: BabySplit-Debug-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 30
