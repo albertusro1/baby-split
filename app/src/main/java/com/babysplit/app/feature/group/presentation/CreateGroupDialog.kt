@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.feature.group.presentation
+package com.babysplit.app.feature.group.presentation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -104,7 +104,6 @@ fun CreateGroupDialog(
                 Text("Create")
             }
         },
-        onDismissRequest = onDismiss,
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel")

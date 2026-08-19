@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.feature.dashboard.presentation
+package com.babysplit.app.feature.dashboard.presentation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -164,7 +164,7 @@ fun DashboardScreen(
                                     )
                                 }
                             }
-                            Icon(Icons.AutoMirrored.Filled.ChevronRight, contentDescription = null, tint = Color.Gray)
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.Gray)
                         }
                     }
                 }
