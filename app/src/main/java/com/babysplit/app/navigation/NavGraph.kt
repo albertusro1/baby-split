@@ -225,6 +225,8 @@ fun NavGraph(
                 members = memberEntities,
                 expensesWithParticipants = expenseEntities,
                 paymentDetails = paymentDetails,
+                isSignedIn = dashboardState.isSignedIn,
+                isCloudTrip = groupState.trip?.isCloud == true,
                 onBackClick = { navController.popBackStack() },
                 onAddExpenseClick = { _ ->
                     navController.navigate(Screen.AddEditExpense.createRoute(tripId))

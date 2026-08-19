@@ -52,6 +52,8 @@ fun GroupDetailScreen(
     members: List<MemberEntity>,
     expensesWithParticipants: List<ExpenseWithParticipants>,
     paymentDetails: HostPaymentDetails?,
+    isSignedIn: Boolean = false,
+    isCloudTrip: Boolean = false,
     onBackClick: () -> Unit,
     onAddExpenseClick: (Long) -> Unit,
     onAddMember: (name: String, type: String, email: String?, phone: String?, bankName: String?, holderName: String?, bankAcc: String?, walletName: String?, walletHandle: String?) -> Unit,
@@ -141,11 +143,10 @@ fun GroupDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onInviteClick) {
-                        Icon(Icons.Filled.GroupAdd, contentDescription = "Invite Members", tint = ChickAmber)
-                    }
-                    IconButton(onClick = { showAddMemberDialog = true }) {
-                        Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member", tint = ChickAmber)
+                    if (isCloudTrip && isSignedIn) {
+                        IconButton(onClick = onInviteClick) {
+                            Icon(Icons.Filled.Link, contentDescription = "Share Invite Code", tint = ChickAmber)
+                        }
                     }
                     IconButton(onClick = {
                         try {
@@ -328,6 +329,7 @@ fun GroupDetailScreen(
                     simplifiedTransactions = simplifiedTransactions,
                     expenses = expenses,
                     paymentDetails = paymentDetails,
+                    onAddMemberClick = { showAddMemberDialog = true },
                     onSettleUpClick = { showSettlementDialog = true },
                     onEditMemberPayment = { editingPaymentMember = it }
                 )
@@ -649,6 +651,7 @@ private fun BalancesTab(
     simplifiedTransactions: List<DebtSimplificationEngine.SimplifiedTransaction>,
     expenses: List<Expense>,
     paymentDetails: HostPaymentDetails?,
+    onAddMemberClick: () -> Unit = {},
     onSettleUpClick: () -> Unit,
     onEditMemberPayment: (MemberEntity) -> Unit = {}
 ) {
@@ -708,15 +711,28 @@ private fun BalancesTab(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Individual Balances", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                Button(
-                    onClick = onSettleUpClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Filled.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Settle Up", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Members & Balances (${members.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onAddMemberClick,
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        border = BorderStroke(1.dp, ChickAmber)
+                    ) {
+                        Icon(Icons.Filled.PersonAdd, contentDescription = null, tint = ChickAmber, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add Member", fontSize = 12.sp, color = ChickAmber, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onSettleUpClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Filled.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Settle Up", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
