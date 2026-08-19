@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.babysplit.app.BabySplitApplication
+import com.babysplit.app.core.database.dao.ExpenseWithParticipants
 import com.babysplit.app.core.database.entity.ExpenseEntity
 import com.babysplit.app.core.database.entity.ExpenseParticipantEntity
 import com.babysplit.app.core.database.entity.GroupEntity

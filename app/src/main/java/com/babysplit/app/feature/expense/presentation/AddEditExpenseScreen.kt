@@ -168,86 +168,74 @@ fun AddEditExpenseScreen(
         paidByMemberId
     ) {
         if (paidByMemberId == 0L || !members.any { it.id == paidByMemberId }) {
-            return@remember Triple(emptyList(), false, "Please select who paid for this expense.")
+            return@remember Triple(emptyList<ExpenseParticipant>(), false, "Please select who paid for this expense.")
         }
         if (totalAmountCents <= 0) {
-            return@remember Triple(emptyList(), false, "Please enter an expense amount.")
+            return@remember Triple(emptyList<ExpenseParticipant>(), false, "Please enter an expense amount.")
         }
 
         when (splitType) {
             SplitType.EQUAL -> {
                 val activeMembers = members.filter { equalSelectionMap[it.id] == true }
                 if (activeMembers.isEmpty()) {
-                    Triple(emptyList(), false, "Select at least 1 person to split with.")
+                    Triple(emptyList<ExpenseParticipant>(), false, "Select at least 1 person to split with.")
                 } else {
                     val inputs = activeMembers.map { SplitCalculator.MemberInput(it.id, it.name, 1.0) }
-                    val result = SplitCalculator.calculateSplit(
-                        totalAmountCents = totalAmountCents,
-                        splitType = SplitType.EQUAL,
-                        memberInputs = inputs
-                    )
-                    Triple(result.participants, result.isValid, result.validationError)
+                    val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.EQUAL)
+                    Triple(parts, true, null)
                 }
             }
             SplitType.PERCENTAGE -> {
+                val sumPct = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
+                val remainingPct = 100.0 - sumPct
+                val isValid = kotlin.math.abs(remainingPct) < 0.01
                 val inputs = members.map {
-                    val pct = memberInputs[it.id]?.toDoubleOrNull() ?: 0.0
-                    SplitCalculator.MemberInput(it.id, it.name, pct)
+                    SplitCalculator.MemberInput(it.id, it.name, memberInputs[it.id]?.toDoubleOrNull() ?: 0.0)
                 }
-                val result = SplitCalculator.calculateSplit(
-                    totalAmountCents = totalAmountCents,
-                    splitType = SplitType.PERCENTAGE,
-                    memberInputs = inputs
-                )
-                val sumPct = inputs.sumOf { it.shareValue }
-                val errorMsg = if (!result.isValid) {
-                    val diff = 100.0 - sumPct
-                    "Total percent is ${String.format(java.util.Locale.US, "%.1f", sumPct)}% (needs ${if (diff > 0) "+${String.format(java.util.Locale.US, "%.1f", diff)}%" else "${String.format(java.util.Locale.US, "%.1f", diff)}%"})"
+                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.PERCENTAGE)
+                val msg = if (!isValid) {
+                    val formattedSum = if (sumPct % 1.0 == 0.0) sumPct.toInt().toString() else String.format(java.util.Locale.US, "%.1f", sumPct)
+                    val formattedRem = if (remainingPct % 1.0 == 0.0) remainingPct.toInt().toString() else String.format(java.util.Locale.US, "%.1f", remainingPct)
+                    "Total is $formattedSum% ($formattedRem% remaining). Must equal 100%."
                 } else null
-                Triple(result.participants, result.isValid, errorMsg)
+                Triple(parts, isValid, msg)
             }
             SplitType.EXACT -> {
+                val sumExactDollars = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
+                val sumExactCents = (sumExactDollars * 100).roundToLong()
+                val diffCents = totalAmountCents - sumExactCents
+                val isValid = diffCents == 0L
                 val inputs = members.map {
-                    val exactAmt = memberInputs[it.id]?.toDoubleOrNull() ?: 0.0
-                    SplitCalculator.MemberInput(it.id, it.name, exactAmt * 100)
+                    val cents = ((memberInputs[it.id]?.toDoubleOrNull() ?: 0.0) * 100).roundToLong()
+                    SplitCalculator.MemberInput(it.id, it.name, cents.toDouble())
                 }
-                val result = SplitCalculator.calculateSplit(
-                    totalAmountCents = totalAmountCents,
-                    splitType = SplitType.EXACT,
-                    memberInputs = inputs
-                )
-                val sumExactCents = inputs.sumOf { it.shareValue.toLong() }
-                val errorMsg = if (!result.isValid) {
-                    val diffCents = totalAmountCents - sumExactCents
-                    "Total assigned is ${BillSummaryFormatter.formatCents(sumExactCents, currency)} (${if (diffCents > 0) "remaining ${BillSummaryFormatter.formatCents(diffCents, currency)}" else "over by ${BillSummaryFormatter.formatCents(-diffCents, currency)}"})"
+                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.EXACT)
+                val msg = if (!isValid) {
+                    val formattedAssigned = BillSummaryFormatter.formatCents(sumExactCents, currency)
+                    val formattedDiff = BillSummaryFormatter.formatCents(kotlin.math.abs(diffCents), currency)
+                    if (diffCents > 0) "Assigned: $formattedAssigned ($formattedDiff remaining)." else "Assigned: $formattedAssigned (over by $formattedDiff)."
                 } else null
-                Triple(result.participants, result.isValid, errorMsg)
+                Triple(parts, isValid, msg)
             }
             SplitType.SHARE -> {
+                val sumShares = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
+                val isValid = sumShares > 0.0
                 val inputs = members.map {
-                    val share = memberInputs[it.id]?.toDoubleOrNull() ?: 0.0
-                    SplitCalculator.MemberInput(it.id, it.name, share)
+                    SplitCalculator.MemberInput(it.id, it.name, memberInputs[it.id]?.toDoubleOrNull() ?: 0.0)
                 }
-                val result = SplitCalculator.calculateSplit(
-                    totalAmountCents = totalAmountCents,
-                    splitType = SplitType.SHARE,
-                    memberInputs = inputs
-                )
-                Triple(result.participants, result.isValid, result.validationError)
+                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.SHARE)
+                val msg = if (!isValid) "Total shares must be greater than 0." else null
+                Triple(parts, isValid, msg)
             }
             SplitType.ADJUSTMENT -> {
                 val inputs = members.map {
-                    val adj = memberInputs[it.id]?.toDoubleOrNull() ?: 0.0
-                    SplitCalculator.MemberInput(it.id, it.name, adj * 100)
+                    val adjCents = ((memberInputs[it.id]?.toDoubleOrNull() ?: 0.0) * 100).roundToLong()
+                    SplitCalculator.MemberInput(it.id, it.name, adjCents.toDouble())
                 }
-                val result = SplitCalculator.calculateSplit(
-                    totalAmountCents = totalAmountCents,
-                    splitType = SplitType.ADJUSTMENT,
-                    memberInputs = inputs
-                )
-                Triple(result.participants, result.isValid, result.validationError)
+                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.ADJUSTMENT)
+                Triple(parts, true, null)
             }
-            else -> Triple(emptyList(), false, null)
+            else -> Triple(emptyList<ExpenseParticipant>(), false, null)
         }
     }
 
