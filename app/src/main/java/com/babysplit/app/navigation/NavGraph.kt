@@ -82,12 +82,17 @@ fun NavGraph(
                                     simplifyDebts = simplifyDebts
                                 )
                             )
-                            // Add host as the first member
+                            // Add host as the first member with current payment details
                             database.memberDao().insertMember(
                                 MemberEntity(
                                     groupId = groupId,
                                     name = "You (Host)",
-                                    memberType = "HOST"
+                                    memberType = "HOST",
+                                    bankName = paymentDetails?.bankName,
+                                    accountHolderName = paymentDetails?.accountHolderName ?: userName,
+                                    bankAccountNumber = paymentDetails?.bankAccountNumber,
+                                    eWalletName = paymentDetails?.eWalletName,
+                                    eWalletHandle = paymentDetails?.eWalletHandle
                                 )
                             )
                             com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
@@ -276,6 +281,25 @@ fun NavGraph(
                 onSavePaymentDetails = { bank, holder, account, wallet, handle, note, curr ->
                     scope.launch {
                         userPrefs.savePaymentDetails(bank, holder, account, wallet, handle, note, curr)
+                        val allGroups = database.groupDao().getAllGroupsDirect()
+                        for (g in allGroups) {
+                            val members = database.memberDao().getMembersForGroupDirect(g.id)
+                            for (m in members) {
+                                if (m.memberType == "HOST" || m.name.contains("Host", ignoreCase = true) || m.name.contains("You", ignoreCase = true)) {
+                                    database.memberDao().updateMember(
+                                        m.copy(
+                                            bankName = bank,
+                                            accountHolderName = holder ?: m.accountHolderName,
+                                            bankAccountNumber = account,
+                                            eWalletName = wallet,
+                                            eWalletHandle = handle
+                                        )
+                                    )
+                                }
+                            }
+                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, g.id)
+                        }
+                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.exportProfileToCloud(context, userPrefs)
                     }
                 },
                 onSaveUserProfile = { name, email ->

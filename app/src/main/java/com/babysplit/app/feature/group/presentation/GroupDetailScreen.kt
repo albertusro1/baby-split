@@ -749,7 +749,17 @@ private fun BalancesTab(
                         // If member is owed money (creditor), show bank info chip with quick-edit
                         if (balance.netBalanceCents > 0 && member != null) {
                             Spacer(modifier = Modifier.height(4.dp))
-                            val hasBank = !member.bankAccountNumber.isNullOrBlank() || !member.eWalletHandle.isNullOrBlank()
+                            val isHost = member.memberType == "HOST" ||
+                                member.name.contains("Host", ignoreCase = true) ||
+                                member.name.contains("You", ignoreCase = true) ||
+                                (paymentDetails != null && member.name.equals(paymentDetails.hostName, ignoreCase = true))
+
+                            val effBank = member.bankName ?: if (isHost) paymentDetails?.bankName else null
+                            val effAccount = member.bankAccountNumber ?: if (isHost) paymentDetails?.bankAccountNumber else null
+                            val effWallet = member.eWalletName ?: if (isHost) paymentDetails?.eWalletName else null
+                            val effHandle = member.eWalletHandle ?: if (isHost) paymentDetails?.eWalletHandle else null
+
+                            val hasBank = !effAccount.isNullOrBlank() || !effHandle.isNullOrBlank()
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = if (hasBank) ChickYellowSubtle else BackgroundLight,
@@ -764,7 +774,7 @@ private fun BalancesTab(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = if (hasBank) {
-                                            val bankText = if (!member.bankAccountNumber.isNullOrBlank()) "${member.bankName ?: "Bank"}: ${member.bankAccountNumber}" else member.eWalletHandle ?: ""
+                                            val bankText = if (!effAccount.isNullOrBlank()) "${effBank ?: "Bank"}: $effAccount" else "${effWallet ?: "E-Wallet"}: $effHandle"
                                             "💳 $bankText ✏️"
                                         } else {
                                             "+ Add Bank / QRIS ✏️"
