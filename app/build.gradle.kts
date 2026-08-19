@@ -96,11 +96,6 @@ dependencies {
     implementation(libs.google.id)
     implementation(libs.play.services.auth)
 
-    // Google Drive & Gmail APIs
-    implementation(libs.google.api.client.android)
-    implementation(libs.google.api.services.drive)
-    implementation(libs.google.api.services.gmail)
-
     // CameraX
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
