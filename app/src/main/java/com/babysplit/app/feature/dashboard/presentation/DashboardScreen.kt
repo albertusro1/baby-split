@@ -1,4 +1,4 @@
-package com.babysplit.app.feature.dashboard.presentation
+﻿package com.babysplit.app.feature.dashboard.presentation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,7 +39,7 @@ fun DashboardScreen(
                 },
                 actions = {
                     IconButton(onClick = onProfileClick) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile")
+                        Icon(Icons.Filled.AccountCircle, contentDescription = "Profile")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -49,7 +50,7 @@ fun DashboardScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onCreateGroupClick,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                 text = { Text("New Trip / Group") },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
@@ -163,7 +164,7 @@ fun DashboardScreen(
                                     )
                                 }
                             }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+                            Icon(Icons.AutoMirrored.Filled.ChevronRight, contentDescription = null, tint = Color.Gray)
                         }
                     }
                 }
@@ -172,3 +173,4 @@ fun DashboardScreen(
         }
     }
 }
+

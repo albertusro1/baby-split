@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -120,16 +121,16 @@ fun GroupDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
                     IconButton(onClick = { showAddMemberDialog = true }) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = "Add Member")
+                        Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member")
                     }
                     if (!group.isFinished) {
                         IconButton(onClick = { showFinishTripDialog = true }) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = "Finish Trip", tint = Color(0xFF388E3C))
+                            Icon(Icons.Filled.CheckCircle, contentDescription = "Finish Trip", tint = Color(0xFF388E3C))
                         }
                     }
                 }
@@ -139,7 +140,7 @@ fun GroupDetailScreen(
             if (selectedTab == 0 && !group.isFinished) {
                 ExtendedFloatingActionButton(
                     onClick = { onAddExpenseClick(group.id) },
-                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                     text = { Text("Add Expense") },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color.White
@@ -305,7 +306,7 @@ private fun ExpensesTab(
                             fontSize = 15.sp
                         )
                         IconButton(onClick = { onShareSingleExpense(expense) }) {
-                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color(0xFF25D366))
+                            Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color(0xFF25D366))
                         }
                     }
                 }
@@ -362,7 +363,7 @@ private fun BalancesTab(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, tint = Color.White)
+                        Icon(Icons.Filled.Share, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Share", color = Color.White)
                     }
@@ -378,7 +379,7 @@ private fun BalancesTab(
             ) {
                 Text("Individual Balances", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 FilledTonalButton(onClick = onSettleUpClick) {
-                    Icon(Icons.Default.Payment, contentDescription = null)
+                    Icon(Icons.Filled.Payment, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Settle Up")
                 }
@@ -430,7 +431,7 @@ private fun BalancesTab(
                             WhatsAppShareHelper.shareToWhatsApp(context, msg, member?.phoneNumber)
                         }
                     ) {
-                        Icon(Icons.Default.Send, contentDescription = "Send Breakdown", tint = Color(0xFF25D366))
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send Breakdown", tint = Color(0xFF25D366))
                     }
                 }
             }
@@ -530,3 +531,4 @@ private fun TotalsTab(
         item { Spacer(modifier = Modifier.height(40.dp)) }
     }
 }
+

@@ -1,4 +1,4 @@
-﻿[versions]
+[versions]
 agp = "8.8.0"
 kotlin = "2.1.0"
 coreKtx = "1.15.0"
@@ -18,8 +18,8 @@ credentials = "1.5.0-rc01"
 googleId = "1.1.1"
 playServicesAuth = "21.3.0"
 googleApiClient = "2.7.1"
-googleApiDrive = "v3-rev20241027-2.0.0"
-googleApiGmail = "v1-rev20240418-2.0.0"
+googleApiDrive = "v3-rev20240509-2.0.0"
+googleApiGmail = "v1-rev20220404-2.0.0"
 camerax = "1.4.1"
 mockk = "1.13.16"
 turbine = "1.2.0"
