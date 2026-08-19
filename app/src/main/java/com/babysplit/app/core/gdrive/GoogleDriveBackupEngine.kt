@@ -222,9 +222,9 @@ object GoogleDriveBackupEngine {
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             val email = userPrefs.getUserEmailDirect()
-            val details = kotlinx.coroutines.flow.firstOrNull(userPrefs.hostPaymentDetailsFlow)
-            val currency = kotlinx.coroutines.flow.firstOrNull(userPrefs.defaultCurrencyFlow) ?: "USD"
-            val name = kotlinx.coroutines.flow.firstOrNull(userPrefs.userNameFlow) ?: "Host"
+            val details = userPrefs.hostPaymentDetailsFlow.firstOrNull()
+            val currency = userPrefs.defaultCurrencyFlow.firstOrNull() ?: "USD"
+            val name = userPrefs.userNameFlow.firstOrNull() ?: "Host"
 
             val json = JSONObject().apply {
                 put("version", 1)
