@@ -29,6 +29,8 @@ fun ProfileScreen(
     userName: String = "Guest",
     userEmail: String? = null,
     isSignedIn: Boolean = false,
+    isSigningIn: Boolean = false,
+    authErrorMessage: String? = null,
     onSignInClick: () -> Unit = {},
     onSignOutClick: () -> Unit = {},
     onBackClick: () -> Unit,
@@ -168,15 +170,42 @@ fun ProfileScreen(
                                 fontSize = 12.sp,
                                 color = TextSecondary
                             )
+
+                            if (!authErrorMessage.isNullOrBlank()) {
+                                Surface(
+                                    color = Color(0xFFFFEBEE),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "⚠️ $authErrorMessage",
+                                        color = Color(0xFFC62828),
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
+
                             Button(
                                 onClick = onSignInClick,
+                                enabled = !isSigningIn,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = ChickAmber)
                             ) {
-                                Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Sign In with Google", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                if (isSigningIn) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Signing in...", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                } else {
+                                    Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Sign In with Google", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }

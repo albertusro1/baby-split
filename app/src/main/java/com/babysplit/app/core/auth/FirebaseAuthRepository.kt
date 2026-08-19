@@ -14,13 +14,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import java.security.MessageDigest
-import java.util.UUID
 
 class FirebaseAuthRepository(private val context: Context) {
 
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-    private val credentialManager = CredentialManager.create(context)
 
     /**
      * Returns the currently signed-in Firebase user, or null if not signed in.
@@ -35,6 +32,7 @@ class FirebaseAuthRepository(private val context: Context) {
             trySend(firebaseAuth.currentUser)
         }
         auth.addAuthStateListener(listener)
+        trySend(auth.currentUser)
         awaitClose { auth.removeAuthStateListener(listener) }
     }
 
@@ -42,21 +40,17 @@ class FirebaseAuthRepository(private val context: Context) {
      * Initiates Google Sign-In via Credential Manager bottom sheet.
      * On success, signs into Firebase Auth and returns the FirebaseUser.
      *
+     * @param activityContext Must be an Activity Context to display the Credential Manager UI
      * @param webClientId The Web Client ID from Firebase Console (Authentication > Google > Web SDK config)
      */
-    suspend fun signInWithGoogle(webClientId: String): Result<FirebaseUser> {
+    suspend fun signInWithGoogle(activityContext: Context, webClientId: String): Result<FirebaseUser> {
         return try {
-            // Generate nonce for security
-            val rawNonce = UUID.randomUUID().toString()
-            val md = MessageDigest.getInstance("SHA-256")
-            val digest = md.digest(rawNonce.toByteArray())
-            val hashedNonce = digest.fold("") { str, it -> str + "%02x".format(it) }
+            val credentialManager = CredentialManager.create(activityContext)
 
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(webClientId)
-                .setAutoSelectEnabled(true)
-                .setNonce(hashedNonce)
+                .setAutoSelectEnabled(false)
                 .build()
 
             val request = GetCredentialRequest.Builder()
@@ -64,7 +58,7 @@ class FirebaseAuthRepository(private val context: Context) {
                 .build()
 
             val result = credentialManager.getCredential(
-                context = context,
+                context = activityContext,
                 request = request
             )
 
@@ -85,6 +79,7 @@ class FirebaseAuthRepository(private val context: Context) {
                 Result.failure(IllegalStateException("Unexpected credential type: ${credential.type}"))
             }
         } catch (e: Exception) {
+            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -92,10 +87,11 @@ class FirebaseAuthRepository(private val context: Context) {
     /**
      * Signs out from Firebase Auth and clears Credential Manager state.
      */
-    suspend fun signOut() {
+    suspend fun signOut(activityContext: Context? = null) {
         auth.signOut()
         try {
-            credentialManager.clearCredentialState(ClearCredentialStateRequest())
+            val manager = CredentialManager.create(activityContext ?: context)
+            manager.clearCredentialState(ClearCredentialStateRequest())
         } catch (_: Exception) {
             // Ignore errors when clearing credential state
         }

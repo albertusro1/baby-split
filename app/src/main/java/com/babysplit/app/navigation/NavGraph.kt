@@ -112,11 +112,13 @@ fun NavGraph(
     LaunchedEffect(dashboardState.joinTripResult) {
         when (val result = dashboardState.joinTripResult) {
             is JoinTripResult.Success -> {
+                android.widget.Toast.makeText(context, "Joined trip successfully! 🎉", android.widget.Toast.LENGTH_SHORT).show()
                 navController.navigate(Screen.GroupDetail.createRoute(result.tripId))
                 dashboardViewModel.clearJoinTripResult()
             }
             is JoinTripResult.Error -> {
-                // Error is shown in UI via dashboardState
+                android.widget.Toast.makeText(context, result.message, android.widget.Toast.LENGTH_LONG).show()
+                dashboardViewModel.clearJoinTripResult()
             }
             null -> {}
         }
@@ -181,10 +183,14 @@ fun NavGraph(
 
             if (showJoinTripDialog) {
                 JoinTripDialog(
+                    isSignedIn = dashboardState.isSignedIn,
                     onDismiss = { showJoinTripDialog = false },
                     onJoin = { code ->
                         dashboardViewModel.joinTripByCode(code)
                         showJoinTripDialog = false
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate(Screen.Profile.route)
                     }
                 )
             }
@@ -380,11 +386,13 @@ fun NavGraph(
                 userName = profileState.userName,
                 userEmail = profileState.userEmail,
                 isSignedIn = profileState.isSignedIn,
+                isSigningIn = profileState.isSigningIn,
+                authErrorMessage = profileState.errorMessage,
                 onSignInClick = {
                     val clientId = context.getString(com.babysplit.app.R.string.default_web_client_id)
-                    profileViewModel.signInWithGoogle(clientId)
+                    profileViewModel.signInWithGoogle(context, clientId)
                 },
-                onSignOutClick = { profileViewModel.signOut() },
+                onSignOutClick = { profileViewModel.signOut(context) },
                 onBackClick = { navController.popBackStack() },
                 onSavePaymentDetails = { bank, holder, account, wallet, handle, note, curr ->
                     profileViewModel.savePaymentDetails(bank, holder, account, wallet, handle, note, curr)

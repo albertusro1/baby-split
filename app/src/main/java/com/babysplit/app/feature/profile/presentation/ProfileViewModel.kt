@@ -61,10 +61,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun signInWithGoogle(webClientId: String) {
+    fun signInWithGoogle(activityContext: android.content.Context, webClientId: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSigningIn = true) }
-            val result = authRepository.signInWithGoogle(webClientId)
+            _uiState.update { it.copy(isSigningIn = true, errorMessage = null) }
+            val result = authRepository.signInWithGoogle(activityContext, webClientId)
             result.fold(
                 onSuccess = { user ->
                     // Save user info to DataStore
@@ -73,20 +73,21 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         email = user.email,
                         avatarUrl = user.photoUrl?.toString()
                     )
-                    _uiState.update { it.copy(isSigningIn = false) }
+                    _uiState.update { it.copy(isSigningIn = false, errorMessage = null) }
                 },
                 onFailure = { e ->
+                    e.printStackTrace()
                     _uiState.update {
-                        it.copy(isSigningIn = false, errorMessage = "Sign-in failed: ${e.message}")
+                        it.copy(isSigningIn = false, errorMessage = "Sign-in failed: ${e.localizedMessage ?: e.message}")
                     }
                 }
             )
         }
     }
 
-    fun signOut() {
+    fun signOut(activityContext: android.content.Context? = null) {
         viewModelScope.launch {
-            authRepository.signOut()
+            authRepository.signOut(activityContext)
             userPrefs.signOut()
         }
     }
