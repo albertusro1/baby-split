@@ -10,21 +10,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.babysplit.app.BabySplitApplication
-import com.babysplit.app.core.database.dao.ExpenseWithParticipants
-import com.babysplit.app.core.database.entity.ExpenseEntity
-import com.babysplit.app.core.database.entity.ExpenseParticipantEntity
-import com.babysplit.app.core.database.entity.GroupEntity
-import com.babysplit.app.core.database.entity.MemberEntity
 import com.babysplit.app.core.repository.ExpenseData
 import com.babysplit.app.core.repository.MemberData
-import com.babysplit.app.core.repository.ParticipantData
 import com.babysplit.app.core.repository.TripData
 import com.babysplit.app.feature.dashboard.presentation.DashboardScreen
 import com.babysplit.app.feature.dashboard.presentation.DashboardViewModel
 import com.babysplit.app.feature.dashboard.presentation.JoinTripResult
-import com.babysplit.app.feature.expense.domain.model.Expense
-import com.babysplit.app.feature.expense.domain.model.ExpenseCategory
-import com.babysplit.app.feature.expense.domain.model.SplitType
 import com.babysplit.app.feature.expense.presentation.AddEditExpenseScreen
 import com.babysplit.app.feature.group.presentation.CreateGroupDialog
 import com.babysplit.app.feature.group.presentation.GroupDetailScreen
@@ -33,60 +24,6 @@ import com.babysplit.app.feature.group.presentation.JoinTripDialog
 import com.babysplit.app.feature.profile.presentation.ProfileScreen
 import com.babysplit.app.feature.profile.presentation.ProfileViewModel
 import kotlinx.coroutines.launch
-
-// ── Bridge Helpers: Convert domain models to Room entities for existing screens ──
-
-private fun TripData.toGroupEntity() = GroupEntity(
-    id = id.toLongOrNull() ?: 0L,
-    name = name,
-    currency = currency,
-    emoji = emoji,
-    simplifyDebts = simplifyDebts,
-    isFinished = isFinished,
-    createdAtEpochMs = createdAtEpochMs
-)
-
-private fun MemberData.toMemberEntity() = MemberEntity(
-    id = id.toLongOrNull() ?: 0L,
-    groupId = tripId.toLongOrNull() ?: 0L,
-    name = name,
-    memberType = memberType,
-    email = email,
-    phoneNumber = phoneNumber,
-    avatarColorHex = avatarColorHex,
-    bankName = bankName,
-    accountHolderName = accountHolderName,
-    bankAccountNumber = bankAccountNumber,
-    eWalletName = eWalletName,
-    eWalletHandle = eWalletHandle
-)
-
-private fun ExpenseData.toExpenseWithParticipants() = ExpenseWithParticipants(
-    expense = ExpenseEntity(
-        id = id,
-        groupId = tripId.toLongOrNull() ?: 0L,
-        title = title,
-        totalAmountCents = totalAmountCents,
-        currency = currency,
-        categoryName = categoryName,
-        paidByMemberId = paidByMemberId.toLongOrNull() ?: 0L,
-        paidByMemberName = paidByMemberName,
-        splitType = splitType,
-        receiptImagePath = receiptImagePath,
-        note = note,
-        createdAtEpochMs = createdAtEpochMs,
-        isSettlement = isSettlement
-    ),
-    participants = participants.map {
-        ExpenseParticipantEntity(
-            expenseId = id,
-            memberId = it.memberId.toLongOrNull() ?: 0L,
-            memberName = it.memberName,
-            amountCents = it.amountCents,
-            rawShareValue = it.rawShareValue
-        )
-    }
-)
 
 @Composable
 fun NavGraph(
@@ -129,25 +66,16 @@ fun NavGraph(
         startDestination = Screen.Dashboard.route
     ) {
         composable(Screen.Dashboard.route) {
-            // Convert TripData to GroupEntity for existing DashboardScreen
-            val groupEntities = dashboardState.trips.map { it.toGroupEntity() }
-
             DashboardScreen(
-                groups = groupEntities,
-                onGroupClick = { groupId ->
-                    // Find the corresponding TripData to get its string ID
-                    val trip = dashboardState.trips.find { it.id.toLongOrNull() == groupId || it.id == groupId.toString() }
-                    val tripId = trip?.id ?: groupId.toString()
+                groups = dashboardState.trips,
+                onGroupClick = { tripId ->
                     navController.navigate(Screen.GroupDetail.createRoute(tripId))
                 },
                 onCreateGroupClick = { showCreateGroupDialog = true },
                 onJoinTripClick = { showJoinTripDialog = true },
                 onProfileClick = { navController.navigate(Screen.Profile.route) },
-                onDeleteGroup = { groupId ->
-                    val trip = dashboardState.trips.find { it.id.toLongOrNull() == groupId || it.id == groupId.toString() }
-                    if (trip != null) {
-                        dashboardViewModel.deleteTrip(trip.id)
-                    }
+                onDeleteGroup = { tripId ->
+                    dashboardViewModel.deleteTrip(tripId)
                 }
             )
 
@@ -197,7 +125,7 @@ fun NavGraph(
             val activeRepo = dashboardViewModel.activeRepository
             val currentUserId = dashboardViewModel.authRepository.getCurrentUser()?.uid ?: ""
 
-            val groupDetailViewModel = remember(tripId) {
+            val groupDetailViewModel = remember(tripId, activeRepo) {
                 GroupDetailViewModel(
                     tripId = tripId,
                     repository = activeRepo,
@@ -206,23 +134,18 @@ fun NavGraph(
             }
             val groupState by groupDetailViewModel.uiState.collectAsState()
 
-            // Bridge: Convert domain models to Room entities for GroupDetailScreen
-            val groupEntity = groupState.trip?.toGroupEntity()
-            val memberEntities = groupState.members.map { it.toMemberEntity() }
-            val expenseEntities = groupState.expenses.map { it.toExpenseWithParticipants() }
-
             var showInviteSheet by remember { mutableStateOf(false) }
 
             GroupDetailScreen(
-                group = groupEntity,
-                members = memberEntities,
-                expensesWithParticipants = expenseEntities,
+                group = groupState.trip,
+                members = groupState.members,
+                expenses = groupState.expenses,
                 paymentDetails = paymentDetails,
                 isSignedIn = dashboardState.isSignedIn,
                 isCloudTrip = groupState.trip?.isCloud == true,
                 onBackClick = { navController.popBackStack() },
-                onAddExpenseClick = { _ ->
-                    navController.navigate(Screen.AddEditExpense.createRoute(tripId))
+                onAddExpenseClick = { tId ->
+                    navController.navigate(Screen.AddEditExpense.createRoute(tId))
                 },
                 onAddMember = { name, type, email, phone, bankName, holderName, bankAcc, walletName, walletHandle ->
                     groupDetailViewModel.addMember(
@@ -237,29 +160,13 @@ fun NavGraph(
                         eWalletHandle = walletHandle
                     )
                 },
-                onUpdateMember = { memberEntity ->
-                    // Convert MemberEntity back to MemberData
-                    val memberData = MemberData(
-                        id = memberEntity.id.toString(),
-                        tripId = tripId,
-                        name = memberEntity.name,
-                        memberType = memberEntity.memberType,
-                        email = memberEntity.email,
-                        phoneNumber = memberEntity.phoneNumber,
-                        avatarColorHex = memberEntity.avatarColorHex,
-                        bankName = memberEntity.bankName,
-                        accountHolderName = memberEntity.accountHolderName,
-                        bankAccountNumber = memberEntity.bankAccountNumber,
-                        eWalletName = memberEntity.eWalletName,
-                        eWalletHandle = memberEntity.eWalletHandle
-                    )
+                onUpdateMember = { memberData ->
                     groupDetailViewModel.updateMember(memberData)
                 },
                 onRecordSettlement = { payerId, receiverId, amountCents ->
-                    // Convert Long IDs to String for the ViewModel
                     groupDetailViewModel.recordSettlement(
-                        payerMemberId = payerId.toString(),
-                        receiverMemberId = receiverId.toString(),
+                        payerMemberId = payerId,
+                        receiverMemberId = receiverId,
                         amountCents = amountCents
                     )
                 },
@@ -269,8 +176,8 @@ fun NavGraph(
                         navController.popBackStack()
                     }
                 },
-                onEditExpense = { _, expId ->
-                    navController.navigate(Screen.AddEditExpense.createRoute(tripId, expId))
+                onEditExpense = { tId, expId ->
+                    navController.navigate(Screen.AddEditExpense.createRoute(tId, expId))
                 },
                 onDeleteExpense = { expId ->
                     groupDetailViewModel.deleteExpense(expId)
@@ -311,22 +218,18 @@ fun NavGraph(
             val members by activeRepo.getMembersStream(tripId).collectAsState(initial = emptyList())
             val trip by activeRepo.getTripStream(tripId).collectAsState(initial = null)
 
-            var existingExpense by remember { mutableStateOf<ExpenseWithParticipants?>(null) }
+            var existingExpense by remember { mutableStateOf<ExpenseData?>(null) }
 
             LaunchedEffect(expenseId) {
                 if (!expenseId.isNullOrBlank()) {
-                    val expenseData = activeRepo.getExpenseById(tripId, expenseId)
-                    existingExpense = expenseData?.toExpenseWithParticipants()
+                    existingExpense = activeRepo.getExpenseById(tripId, expenseId)
                 }
             }
 
-            // Bridge: Convert MemberData to MemberEntity for AddEditExpenseScreen
-            val memberEntities = members.map { it.toMemberEntity() }
-
             AddEditExpenseScreen(
-                groupId = tripId.toLongOrNull() ?: 0L,
+                tripId = tripId,
                 currency = trip?.currency ?: defaultCurrency,
-                members = memberEntities,
+                members = members,
                 existingExpense = existingExpense,
                 onBackClick = { navController.popBackStack() },
                 onDeleteExpense = { expId ->
@@ -335,31 +238,8 @@ fun NavGraph(
                         navController.popBackStack()
                     }
                 },
-                onSaveExpense = { expense ->
+                onSaveExpense = { expenseData ->
                     scope.launch {
-                        val expenseData = ExpenseData(
-                            id = expense.id,
-                            tripId = tripId,
-                            title = expense.title,
-                            totalAmountCents = expense.totalAmountCents,
-                            currency = expense.currency,
-                            categoryName = expense.category.name,
-                            paidByMemberId = expense.paidByMemberId.toString(),
-                            paidByMemberName = expense.paidByMemberName,
-                            splitType = expense.splitType.name,
-                            receiptImagePath = expense.receiptImagePath,
-                            note = expense.note,
-                            createdAtEpochMs = expense.createdAtEpochMs,
-                            isSettlement = expense.isSettlement,
-                            participants = expense.participants.map {
-                                ParticipantData(
-                                    memberId = it.memberId.toString(),
-                                    memberName = it.memberName,
-                                    amountCents = it.amountCents,
-                                    rawShareValue = it.rawShareValue
-                                )
-                            }
-                        )
                         if (expenseId.isNullOrBlank()) {
                             activeRepo.addExpense(tripId, expenseData)
                         } else {
@@ -396,3 +276,4 @@ fun NavGraph(
         }
     }
 }
+

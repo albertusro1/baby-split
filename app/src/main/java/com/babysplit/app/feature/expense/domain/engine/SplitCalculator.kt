@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.feature.expense.domain.engine
+package com.babysplit.app.feature.expense.domain.engine
 
 import com.babysplit.app.feature.expense.domain.model.ExpenseParticipant
 import com.babysplit.app.feature.expense.domain.model.SplitType
@@ -11,7 +11,7 @@ import kotlin.math.roundToLong
 object SplitCalculator {
 
     data class MemberInput(
-        val memberId: Long,
+        val memberId: String,
         val memberName: String,
         val inputValue: Double = 0.0 // Value used for Exact ($), % (0-100), Share (1, 2, ...), or Adj (+/- $)
     )

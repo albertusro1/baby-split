@@ -17,21 +17,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.babysplit.app.core.database.entity.GroupEntity
+import com.babysplit.app.core.repository.TripData
 import com.babysplit.app.core.ui.theme.*
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    groups: List<GroupEntity>,
-    onGroupClick: (Long) -> Unit,
+    groups: List<TripData>,
+    onGroupClick: (String) -> Unit,
     onCreateGroupClick: () -> Unit,
     onJoinTripClick: () -> Unit = {},
     onProfileClick: () -> Unit,
-    onDeleteGroup: (Long) -> Unit = {}
+    onDeleteGroup: (String) -> Unit = {}
 ) {
-    var groupToDelete by remember { mutableStateOf<GroupEntity?>(null) }
+    var groupToDelete by remember { mutableStateOf<TripData?>(null) }
 
     Scaffold(
         containerColor = BackgroundLight,
@@ -190,7 +189,7 @@ fun DashboardScreen(
                                             border = BorderStroke(1.dp, if (group.isFinished) SettledGreen else ChickGold)
                                         ) {
                                             Text(
-                                                text = if (group.isFinished) "Settled ✅" else "Active • ${group.currency}",
+                                                text = if (group.isFinished) "Settled ✅" else if (group.isCloud) "Cloud ☁️ • ${group.currency}" else "Local 📱 • ${group.currency}",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = if (group.isFinished) SettledGreen else TurquoiseDark,

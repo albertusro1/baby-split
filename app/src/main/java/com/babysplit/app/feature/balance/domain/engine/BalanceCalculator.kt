@@ -1,9 +1,9 @@
-﻿package com.babysplit.app.feature.balance.domain.engine
+package com.babysplit.app.feature.balance.domain.engine
 
-import com.babysplit.app.feature.expense.domain.model.Expense
+import com.babysplit.app.core.repository.ExpenseData
 
 data class MemberBalanceSummary(
-    val memberId: Long,
+    val memberId: String,
     val memberName: String,
     val totalPaidCents: Long,
     val totalShareCents: Long,
@@ -16,11 +16,11 @@ object BalanceCalculator {
      * Computes net balance for all members across a list of [expenses].
      */
     fun calculateBalances(
-        expenses: List<Expense>,
-        memberNames: Map<Long, String>
+        expenses: List<ExpenseData>,
+        memberNames: Map<String, String>
     ): List<MemberBalanceSummary> {
-        val paidMap = mutableMapOf<Long, Long>()
-        val shareMap = mutableMapOf<Long, Long>()
+        val paidMap = mutableMapOf<String, Long>()
+        val shareMap = mutableMapOf<String, Long>()
 
         // Initialize with all members
         memberNames.keys.forEach { memberId ->

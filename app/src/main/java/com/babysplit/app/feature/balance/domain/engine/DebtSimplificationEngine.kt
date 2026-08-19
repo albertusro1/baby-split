@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.feature.balance.domain.engine
+package com.babysplit.app.feature.balance.domain.engine
 
 import kotlin.math.min
 
@@ -9,9 +9,9 @@ import kotlin.math.min
 object DebtSimplificationEngine {
 
     data class SimplifiedTransaction(
-        val debtorId: Long,
+        val debtorId: String,
         val debtorName: String,
-        val creditorId: Long,
+        val creditorId: String,
         val creditorName: String,
         val amountCents: Long
     )
@@ -20,11 +20,11 @@ object DebtSimplificationEngine {
      * Simplifies debts given a map of member net balances (positive = owed money, negative = owes money).
      */
     fun simplifyDebts(
-        netBalances: Map<Long, Long>,
-        memberNames: Map<Long, String>
+        netBalances: Map<String, Long>,
+        memberNames: Map<String, String>
     ): List<SimplifiedTransaction> {
         // Separate members into debtors (negative balance) and creditors (positive balance)
-        data class BalanceEntry(val memberId: Long, var amountCents: Long)
+        data class BalanceEntry(val memberId: String, var amountCents: Long)
 
         val debtors = mutableListOf<BalanceEntry>()
         val creditors = mutableListOf<BalanceEntry>()
@@ -54,9 +54,9 @@ object DebtSimplificationEngine {
                 simplified.add(
                     SimplifiedTransaction(
                         debtorId = debtor.memberId,
-                        debtorName = memberNames[debtor.memberId] ?: "Member #",
+                        debtorName = memberNames[debtor.memberId] ?: "Member",
                         creditorId = creditor.memberId,
-                        creditorName = memberNames[creditor.memberId] ?: "Member #",
+                        creditorName = memberNames[creditor.memberId] ?: "Member",
                         amountCents = settleAmount
                     )
                 )

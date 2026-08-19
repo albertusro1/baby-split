@@ -1,9 +1,8 @@
 package com.babysplit.app.core.whatsapp
 
-import com.babysplit.app.feature.expense.domain.model.Expense
-import com.babysplit.app.feature.expense.domain.model.ExpenseCategory
-import com.babysplit.app.feature.expense.domain.model.ExpenseParticipant
-import com.babysplit.app.feature.expense.domain.model.SplitType
+import com.babysplit.app.core.repository.ExpenseData
+import com.babysplit.app.core.repository.MemberData
+import com.babysplit.app.core.repository.ParticipantData
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,17 +16,18 @@ class BillSummaryFormatterTest {
             bankAccountNumber = "123-456-789"
         )
 
-        val expense = Expense(
-            groupId = 1L,
+        val expense = ExpenseData(
+            id = "1",
+            tripId = "1",
             title = "Dinner at Trattoria",
             totalAmountCents = 10000L,
             currency = "USD",
-            category = ExpenseCategory.FOOD,
-            paidByMemberId = 1L,
+            categoryName = "FOOD",
+            paidByMemberId = "1",
             paidByMemberName = "Rowan",
-            splitType = SplitType.EQUAL,
+            splitType = "EQUAL",
             participants = listOf(
-                ExpenseParticipant(2L, "Alice", 2500L)
+                ParticipantData("2", "Alice", 2500L)
             )
         )
 
@@ -57,17 +57,18 @@ class BillSummaryFormatterTest {
             bankAccountNumber = "987-654-321"
         )
 
-        val expense = Expense(
-            groupId = 1L,
+        val expense = ExpenseData(
+            id = "2",
+            tripId = "1",
             title = "Villa Booking",
             totalAmountCents = 50000000L,
             currency = "IDR",
-            category = ExpenseCategory.ACCOMMODATION,
-            paidByMemberId = 1L,
+            categoryName = "ACCOMMODATION",
+            paidByMemberId = "1",
             paidByMemberName = "Rowan",
-            splitType = SplitType.EQUAL,
+            splitType = "EQUAL",
             participants = listOf(
-                ExpenseParticipant(2L, "Bob", 25000000L)
+                ParticipantData("2", "Bob", 25000000L)
             )
         )
 
@@ -96,24 +97,25 @@ class BillSummaryFormatterTest {
             bankAccountNumber = "2450900365"
         )
 
-        val expense = Expense(
-            groupId = 1L,
+        val expense = ExpenseData(
+            id = "3",
+            tripId = "1",
             title = "Dinner by Itik",
             totalAmountCents = 30000000L,
             currency = "IDR",
-            category = ExpenseCategory.FOOD,
-            paidByMemberId = 3L,
+            categoryName = "FOOD",
+            paidByMemberId = "3",
             paidByMemberName = "Itik",
-            splitType = SplitType.EQUAL,
+            splitType = "EQUAL",
             participants = listOf(
-                ExpenseParticipant(2L, "Alice", 10000000L)
+                ParticipantData("2", "Alice", 10000000L)
             )
         )
 
         val tx = com.babysplit.app.feature.balance.domain.engine.DebtSimplificationEngine.SimplifiedTransaction(
-            debtorId = 2L,
+            debtorId = "2",
             debtorName = "Alice",
-            creditorId = 3L,
+            creditorId = "3",
             creditorName = "Itik",
             amountCents = 10000000L
         )
@@ -144,31 +146,32 @@ class BillSummaryFormatterTest {
             bankAccountNumber = "2450900365"
         )
 
-        val expense = Expense(
-            groupId = 1L,
+        val expense = ExpenseData(
+            id = "4",
+            tripId = "1",
             title = "Dinner by Itik",
             totalAmountCents = 30000000L,
             currency = "IDR",
-            category = ExpenseCategory.FOOD,
-            paidByMemberId = 3L,
+            categoryName = "FOOD",
+            paidByMemberId = "3",
             paidByMemberName = "Itik",
-            splitType = SplitType.EQUAL,
+            splitType = "EQUAL",
             participants = listOf(
-                ExpenseParticipant(2L, "Alice", 10000000L)
+                ParticipantData("2", "Alice", 10000000L)
             )
         )
 
         val tx = com.babysplit.app.feature.balance.domain.engine.DebtSimplificationEngine.SimplifiedTransaction(
-            debtorId = 2L,
+            debtorId = "2",
             debtorName = "Alice",
-            creditorId = 3L,
+            creditorId = "3",
             creditorName = "Itik",
             amountCents = 10000000L
         )
 
-        val itikMember = com.babysplit.app.core.database.entity.MemberEntity(
-            id = 3L,
-            groupId = 1L,
+        val itikMember = MemberData(
+            id = "3",
+            tripId = "1",
             name = "Itik",
             bankName = "Bank Jago",
             accountHolderName = "Itik Bebek",

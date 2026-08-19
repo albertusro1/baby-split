@@ -1,24 +1,30 @@
-﻿package com.babysplit.app.feature.settlement.presentation
+package com.babysplit.app.feature.settlement.presentation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.babysplit.app.core.database.entity.MemberEntity
+import com.babysplit.app.core.repository.MemberData
+import com.babysplit.app.core.ui.theme.ChickAmber
+import com.babysplit.app.core.ui.theme.SurfaceLight
+import com.babysplit.app.core.ui.theme.TextPrimary
+import com.babysplit.app.core.ui.theme.TextSecondary
 import kotlin.math.roundToLong
 
 @Composable
 fun RecordSettlementDialog(
-    members: List<MemberEntity>,
+    members: List<MemberData>,
     currency: String,
     onDismiss: () -> Unit,
-    onConfirm: (payerId: Long, receiverId: Long, amountCents: Long) -> Unit
+    onConfirm: (payerId: String, receiverId: String, amountCents: Long) -> Unit
 ) {
     if (members.size < 2) return
 
@@ -28,27 +34,31 @@ fun RecordSettlementDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record Settlement Payment 💸") },
+        containerColor = SurfaceLight,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Text("Record Settlement Payment 💸", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Who Paid?", fontSize = 13.sp)
+                Text("Who Paid?", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(members) { member ->
                         FilterChip(
                             selected = (payerId == member.id),
                             onClick = { payerId = member.id },
-                            label = { Text(member.name) }
+                            label = { Text(member.name, fontWeight = if (payerId == member.id) FontWeight.Bold else FontWeight.Normal) }
                         )
                     }
                 }
 
-                Text("Who Received?", fontSize = 13.sp)
+                Text("Who Received?", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(members.filter { it.id != payerId }) { member ->
                         FilterChip(
                             selected = (receiverId == member.id),
                             onClick = { receiverId = member.id },
-                            label = { Text(member.name) }
+                            label = { Text(member.name, fontWeight = if (receiverId == member.id) FontWeight.Bold else FontWeight.Normal) }
                         )
                     }
                 }
@@ -60,6 +70,7 @@ fun RecordSettlementDialog(
                     placeholder = { Text("0.00") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -73,14 +84,16 @@ fun RecordSettlementDialog(
                         onConfirm(payerId, receiverId, amountVal.roundToLong())
                     }
                 },
-                enabled = amountInput.isNotBlank() && payerId != receiverId
+                enabled = amountInput.isNotBlank() && payerId != receiverId,
+                colors = ButtonDefaults.buttonColors(containerColor = ChickAmber),
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Record Payment")
+                Text("Record Payment", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Cancel", color = TextSecondary)
             }
         }
     )

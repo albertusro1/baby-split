@@ -1,7 +1,9 @@
 package com.babysplit.app.core.whatsapp
 
+import com.babysplit.app.core.repository.ExpenseData
+import com.babysplit.app.core.repository.MemberData
 import com.babysplit.app.feature.balance.domain.engine.DebtSimplificationEngine
-import com.babysplit.app.feature.expense.domain.model.Expense
+import com.babysplit.app.feature.expense.domain.model.ExpenseCategory
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -56,12 +58,12 @@ object BillSummaryFormatter {
     fun formatMemberWhatsAppMessage(
         tripName: String,
         memberName: String,
-        memberExpenses: List<Pair<Expense, Long>>, // Pair of (Expense, member's share cents)
+        memberExpenses: List<Pair<ExpenseData, Long>>, // Pair of (ExpenseData, member's share cents)
         totalOwedCents: Long,
         currency: String,
         paymentDetails: HostPaymentDetails?,
         debtorTransactions: List<DebtSimplificationEngine.SimplifiedTransaction> = emptyList(),
-        creditorMembers: Map<String, com.babysplit.app.core.database.entity.MemberEntity> = emptyMap(),
+        creditorMembers: Map<String, MemberData> = emptyMap(),
         hostMemberName: String? = null
     ): String {
         val sb = StringBuilder()
@@ -72,7 +74,7 @@ object BillSummaryFormatter {
         sb.appendLine()
 
         memberExpenses.forEachIndexed { index, (expense, shareCents) ->
-            val emoji = expense.category.emoji
+            val emoji = ExpenseCategory.fromName(expense.categoryName).emoji
             sb.appendLine("${index + 1}. $emoji *${expense.title}*")
             sb.appendLine("   • Total: ${formatCents(expense.totalAmountCents, currency)}")
             sb.appendLine("   • Your Share: *${formatCents(shareCents, currency)}*")
@@ -154,7 +156,7 @@ object BillSummaryFormatter {
     fun formatMemberHtmlReceipt(
         tripName: String,
         memberName: String,
-        memberExpenses: List<Pair<Expense, Long>>,
+        memberExpenses: List<Pair<ExpenseData, Long>>,
         totalOwedCents: Long,
         currency: String,
         paymentDetails: HostPaymentDetails?
@@ -163,10 +165,11 @@ object BillSummaryFormatter {
         val dateFormatted = dateFormatter.format(Date())
 
         val itemsHtml = memberExpenses.mapIndexed { index, (expense, shareCents) ->
+            val emoji = ExpenseCategory.fromName(expense.categoryName).emoji
             """
             <tr style="border-bottom: 1px solid #E0E0E0;">
                 <td style="padding: 10px 0;">
-                    <strong>${index + 1}. ${expense.category.emoji} ${expense.title}</strong><br/>
+                    <strong>${index + 1}. $emoji ${expense.title}</strong><br/>
                     <span style="font-size: 12px; color: #757575;">Total: ${formatCents(expense.totalAmountCents, currency)}</span>
                 </td>
                 <td style="padding: 10px 0; text-align: right; font-weight: bold; color: #1E88E5;">

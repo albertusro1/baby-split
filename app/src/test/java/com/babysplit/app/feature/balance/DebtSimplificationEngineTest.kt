@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.feature.balance
+package com.babysplit.app.feature.balance
 
 import com.babysplit.app.feature.balance.domain.engine.DebtSimplificationEngine
 import org.junit.Assert.assertEquals
@@ -12,14 +12,14 @@ class DebtSimplificationEngineTest {
         // Net: Alice -20, Bob 0, Charlie +20
         // Result: Alice pays Charlie $20 directly (Bob 0 transactions)
         val netBalances = mapOf(
-            1L to -2000L,
-            2L to 0L,
-            3L to 2000L
+            "1" to -2000L,
+            "2" to 0L,
+            "3" to 2000L
         )
         val memberNames = mapOf(
-            1L to "Alice",
-            2L to "Bob",
-            3L to "Charlie"
+            "1" to "Alice",
+            "2" to "Bob",
+            "3" to "Charlie"
         )
 
         val transactions = DebtSimplificationEngine.simplifyDebts(netBalances, memberNames)
@@ -39,16 +39,16 @@ class DebtSimplificationEngineTest {
         // Charlie: is owed $40 (+4000)
         // Dave: is owed $10 (+1000)
         val netBalances = mapOf(
-            1L to -3000L,
-            2L to -2000L,
-            3L to 4000L,
-            4L to 1000L
+            "1" to -3000L,
+            "2" to -2000L,
+            "3" to 4000L,
+            "4" to 1000L
         )
         val memberNames = mapOf(
-            1L to "Alice",
-            2L to "Bob",
-            3L to "Charlie",
-            4L to "Dave"
+            "1" to "Alice",
+            "2" to "Bob",
+            "3" to "Charlie",
+            "4" to "Dave"
         )
 
         val transactions = DebtSimplificationEngine.simplifyDebts(netBalances, memberNames)

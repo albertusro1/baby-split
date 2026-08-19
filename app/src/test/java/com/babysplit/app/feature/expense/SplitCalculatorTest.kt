@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.feature.expense
+package com.babysplit.app.feature.expense
 
 import com.babysplit.app.feature.expense.domain.engine.SplitCalculator
 import com.babysplit.app.feature.expense.domain.model.SplitType
@@ -11,9 +11,9 @@ class SplitCalculatorTest {
     fun testEqualSplitWithRemainderCents() {
         // $10.00 split among 3 people = $3.34, $3.33, $3.33 -> sum = $10.00 (1000 cents)
         val members = listOf(
-            SplitCalculator.MemberInput(1L, "Alice"),
-            SplitCalculator.MemberInput(2L, "Bob"),
-            SplitCalculator.MemberInput(3L, "Charlie")
+            SplitCalculator.MemberInput("1", "Alice"),
+            SplitCalculator.MemberInput("2", "Bob"),
+            SplitCalculator.MemberInput("3", "Charlie")
         )
 
         val result = SplitCalculator.calculateSplit(1000L, members, SplitType.EQUAL)
@@ -28,9 +28,9 @@ class SplitCalculatorTest {
     @Test
     fun testExactSplit() {
         val members = listOf(
-            SplitCalculator.MemberInput(1L, "Alice", 2500.0), // $25.00
-            SplitCalculator.MemberInput(2L, "Bob", 1550.0),   // $15.50
-            SplitCalculator.MemberInput(3L, "Charlie", 950.0) // $9.50
+            SplitCalculator.MemberInput("1", "Alice", 2500.0), // $25.00
+            SplitCalculator.MemberInput("2", "Bob", 1550.0),   // $15.50
+            SplitCalculator.MemberInput("3", "Charlie", 950.0) // $9.50
         )
 
         val result = SplitCalculator.calculateSplit(5000L, members, SplitType.EXACT)
@@ -46,9 +46,9 @@ class SplitCalculatorTest {
     fun testPercentageSplitWithRoundingAdjustment() {
         // $100.00 split 33.33%, 33.33%, 33.34%
         val members = listOf(
-            SplitCalculator.MemberInput(1L, "Alice", 33.33),
-            SplitCalculator.MemberInput(2L, "Bob", 33.33),
-            SplitCalculator.MemberInput(3L, "Charlie", 33.34)
+            SplitCalculator.MemberInput("1", "Alice", 33.33),
+            SplitCalculator.MemberInput("2", "Bob", 33.33),
+            SplitCalculator.MemberInput("3", "Charlie", 33.34)
         )
 
         val result = SplitCalculator.calculateSplit(10000L, members, SplitType.PERCENTAGE)
@@ -61,9 +61,9 @@ class SplitCalculatorTest {
     fun testShareSplit() {
         // $120.00 split by shares 2 : 1 : 1 (Alice pays 2/4 = $60, Bob $30, Charlie $30)
         val members = listOf(
-            SplitCalculator.MemberInput(1L, "Alice", 2.0),
-            SplitCalculator.MemberInput(2L, "Bob", 1.0),
-            SplitCalculator.MemberInput(3L, "Charlie", 1.0)
+            SplitCalculator.MemberInput("1", "Alice", 2.0),
+            SplitCalculator.MemberInput("2", "Bob", 1.0),
+            SplitCalculator.MemberInput("3", "Charlie", 1.0)
         )
 
         val result = SplitCalculator.calculateSplit(12000L, members, SplitType.SHARE)
@@ -79,8 +79,8 @@ class SplitCalculatorTest {
     fun testAdjustmentSplit() {
         // $100.00 split equally among 2 people ($50 each), but Alice has +$10 adjustment -> Alice $60, Bob $40
         val members = listOf(
-            SplitCalculator.MemberInput(1L, "Alice", 1000.0), // +$10.00
-            SplitCalculator.MemberInput(2L, "Bob", -1000.0)   // -$10.00
+            SplitCalculator.MemberInput("1", "Alice", 1000.0), // +$10.00
+            SplitCalculator.MemberInput("2", "Bob", -1000.0)   // -$10.00
         )
 
         val result = SplitCalculator.calculateSplit(10000L, members, SplitType.ADJUSTMENT)

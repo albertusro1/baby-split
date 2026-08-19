@@ -1,11 +1,11 @@
-﻿package com.babysplit.app.core.gmail
+package com.babysplit.app.core.gmail
 
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.babysplit.app.core.repository.ExpenseData
 import com.babysplit.app.core.whatsapp.BillSummaryFormatter
 import com.babysplit.app.core.whatsapp.HostPaymentDetails
-import com.babysplit.app.feature.expense.domain.model.Expense
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -20,7 +20,7 @@ object GmailReceiptDispatcher {
         recipientEmail: String,
         recipientName: String,
         tripName: String,
-        memberExpenses: List<Pair<Expense, Long>>,
+        memberExpenses: List<Pair<ExpenseData, Long>>,
         totalOwedCents: Long,
         currency: String,
         paymentDetails: HostPaymentDetails?

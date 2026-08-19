@@ -12,8 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,19 +26,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.babysplit.app.core.database.dao.ExpenseWithParticipants
-import com.babysplit.app.core.database.entity.GroupEntity
-import com.babysplit.app.core.database.entity.MemberEntity
+import com.babysplit.app.core.repository.ExpenseData
+import com.babysplit.app.core.repository.MemberData
+import com.babysplit.app.core.repository.TripData
 import com.babysplit.app.core.ui.theme.*
 import com.babysplit.app.core.whatsapp.BillSummaryFormatter
 import com.babysplit.app.core.whatsapp.HostPaymentDetails
 import com.babysplit.app.core.whatsapp.WhatsAppShareHelper
 import com.babysplit.app.feature.balance.domain.engine.BalanceCalculator
 import com.babysplit.app.feature.balance.domain.engine.DebtSimplificationEngine
-import com.babysplit.app.feature.expense.domain.model.Expense
 import com.babysplit.app.feature.expense.domain.model.ExpenseCategory
-import com.babysplit.app.feature.expense.domain.model.ExpenseParticipant
-import com.babysplit.app.feature.expense.domain.model.SplitType
 import com.babysplit.app.feature.members.presentation.AddMemberDialog
 import com.babysplit.app.feature.settlement.presentation.RecordSettlementDialog
 import java.text.SimpleDateFormat
@@ -48,26 +45,26 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupDetailScreen(
-    group: GroupEntity?,
-    members: List<MemberEntity>,
-    expensesWithParticipants: List<ExpenseWithParticipants>,
+    group: TripData?,
+    members: List<MemberData>,
+    expenses: List<ExpenseData>,
     paymentDetails: HostPaymentDetails?,
     isSignedIn: Boolean = false,
     isCloudTrip: Boolean = false,
     onBackClick: () -> Unit,
-    onAddExpenseClick: (Long) -> Unit,
+    onAddExpenseClick: (String) -> Unit,
     onAddMember: (name: String, type: String, email: String?, phone: String?, bankName: String?, holderName: String?, bankAcc: String?, walletName: String?, walletHandle: String?) -> Unit,
-    onUpdateMember: (MemberEntity) -> Unit = {},
-    onRecordSettlement: (paidByMemberId: Long, paidToMemberId: Long, amountCents: Long) -> Unit,
+    onUpdateMember: (MemberData) -> Unit = {},
+    onRecordSettlement: (paidByMemberId: String, paidToMemberId: String, amountCents: Long) -> Unit,
     onFinishTrip: () -> Unit,
     onDeleteTrip: () -> Unit = {},
-    onEditExpense: (groupId: Long, expenseId: String) -> Unit = { _, _ -> },
+    onEditExpense: (tripId: String, expenseId: String) -> Unit = { _, _ -> },
     onDeleteExpense: (expenseId: String) -> Unit = {},
     onInviteClick: () -> Unit = {}
 ) {
     if (group == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = ChickAmber)
         }
         return
     }
@@ -75,37 +72,13 @@ fun GroupDetailScreen(
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddMemberDialog by remember { mutableStateOf(false) }
-    var editingPaymentMember by remember { mutableStateOf<MemberEntity?>(null) }
+    var editingPaymentMember by remember { mutableStateOf<MemberData?>(null) }
     var showSettlementDialog by remember { mutableStateOf(false) }
     var showFinishTripDialog by remember { mutableStateOf(false) }
     var showDeleteTripDialog by remember { mutableStateOf(false) }
 
     val tabs = listOf("Expenses", "Balances & Settle", "Totals")
     val memberMap = remember(members) { members.associate { it.id to it.name } }
-
-    val expenses = remember(expensesWithParticipants) {
-        expensesWithParticipants.map { expWithParts ->
-            val exp = expWithParts.expense
-            Expense(
-                id = exp.id,
-                groupId = exp.groupId,
-                title = exp.title,
-                totalAmountCents = exp.totalAmountCents,
-                currency = exp.currency,
-                category = ExpenseCategory.fromName(exp.categoryName),
-                paidByMemberId = exp.paidByMemberId,
-                paidByMemberName = exp.paidByMemberName,
-                splitType = SplitType.valueOf(exp.splitType),
-                participants = expWithParts.participants.map {
-                    ExpenseParticipant(it.memberId, it.memberName, it.amountCents, it.rawShareValue)
-                },
-                receiptImagePath = exp.receiptImagePath,
-                note = exp.note,
-                createdAtEpochMs = exp.createdAtEpochMs,
-                isSettlement = exp.isSettlement
-            )
-        }
-    }
 
     val memberBalances = remember(expenses, memberMap) {
         BalanceCalculator.calculateBalances(expenses, memberMap)
@@ -339,7 +312,7 @@ fun GroupDetailScreen(
             text = {
                 Text(
                     "This will finalize all expenses and balances for '${group.name}'.\n\n" +
-                    "• Trip records and receipts will be safely archived to Google Drive (if connected).\n" +
+                    "• All balances and settlements will be marked as complete.\n" +
                     "• You can still view full expense histories, receipts, and share WhatsApp summaries anytime.",
                     color = TextSecondary
                 )
@@ -367,14 +340,14 @@ fun GroupDetailScreen(
 
 @Composable
 private fun ExpensesTab(
-    expenses: List<Expense>,
+    expenses: List<ExpenseData>,
     currency: String,
     onEditExpense: (String) -> Unit = {},
     onDeleteExpense: (String) -> Unit = {},
-    onShareSingleExpense: (Expense) -> Unit
+    onShareSingleExpense: (ExpenseData) -> Unit
 ) {
     var viewingReceiptPath by remember { mutableStateOf<String?>(null) }
-    var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
+    var expenseToDelete by remember { mutableStateOf<ExpenseData?>(null) }
 
     if (expenses.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -392,6 +365,7 @@ private fun ExpensesTab(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(expenses) { expense ->
+            val cat = ExpenseCategory.fromName(expense.categoryName)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
@@ -411,7 +385,7 @@ private fun ExpensesTab(
                                 modifier = Modifier.size(44.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Text(expense.category.emoji, fontSize = 20.sp)
+                                    Text(cat.emoji, fontSize = 20.sp)
                                 }
                             }
                             Spacer(modifier = Modifier.width(12.dp))
@@ -565,14 +539,14 @@ private fun ExpensesTab(
 private fun BalancesTab(
     groupName: String,
     currency: String,
-    members: List<MemberEntity>,
+    members: List<MemberData>,
     balances: List<com.babysplit.app.feature.balance.domain.engine.MemberBalanceSummary>,
     simplifiedTransactions: List<DebtSimplificationEngine.SimplifiedTransaction>,
-    expenses: List<Expense>,
+    expenses: List<ExpenseData>,
     paymentDetails: HostPaymentDetails?,
     onAddMemberClick: () -> Unit = {},
     onSettleUpClick: () -> Unit,
-    onEditMemberPayment: (MemberEntity) -> Unit = {}
+    onEditMemberPayment: (MemberData) -> Unit = {}
 ) {
     val context = LocalContext.current
     val totalDebtCents = remember(simplifiedTransactions) {
@@ -582,7 +556,7 @@ private fun BalancesTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 1. Hero Settlement Card
@@ -599,8 +573,8 @@ private fun BalancesTab(
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -611,19 +585,19 @@ private fun BalancesTab(
                             Text(
                                 text = if (totalDebtCents > 0) "Outstanding Debts" else "Settlement Status",
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = TextSecondary
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = if (totalDebtCents > 0) {
                                     BillSummaryFormatter.formatCents(totalDebtCents, currency)
                                 } else {
                                     "All Settled Up! 🎉"
                                 },
-                                fontSize = 24.sp,
+                                fontSize = 26.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = if (totalDebtCents > 0) ChickAmber else Color(0xFF2E7D32)
+                                color = if (totalDebtCents > 0) ChickAmber else SettledGreen
                             )
                         }
 
@@ -638,7 +612,7 @@ private fun BalancesTab(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF7A4F00),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                 )
                             }
                         }
@@ -693,7 +667,7 @@ private fun BalancesTab(
                 Text(
                     text = "⚡ Who Pays Whom (${simplifiedTransactions.size})",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     color = TextPrimary
                 )
             }
@@ -716,19 +690,20 @@ private fun BalancesTab(
                             Surface(
                                 shape = CircleShape,
                                 color = Color(0xFFFFEBEE),
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(38.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Text("💸", fontSize = 16.sp)
+                                    Text("💸", fontSize = 18.sp)
                                 }
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(tx.debtorName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
                                     Text(" ➔ ", color = TextSecondary, fontSize = 12.sp)
                                     Text(tx.creditorName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
                                 }
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "needs to transfer",
                                     fontSize = 11.sp,
@@ -740,7 +715,7 @@ private fun BalancesTab(
                         Text(
                             text = BillSummaryFormatter.formatCents(tx.amountCents, currency),
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 15.sp,
+                            fontSize = 16.sp,
                             color = ChickAmber
                         )
                     }
@@ -758,7 +733,7 @@ private fun BalancesTab(
                 Text(
                     text = "👥 Individual Balances (${members.size})",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     color = TextPrimary
                 )
                 TextButton(
@@ -796,18 +771,18 @@ private fun BalancesTab(
                             Surface(
                                 shape = CircleShape,
                                 color = if (balance.netBalanceCents > 0) Color(0xFFE8F5E9) else if (balance.netBalanceCents < 0) Color(0xFFFFEBEE) else BackgroundLight,
-                                modifier = Modifier.size(38.dp)
+                                modifier = Modifier.size(40.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
                                         text = balance.memberName.take(1).uppercase(),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 16.sp,
-                                        color = if (balance.netBalanceCents > 0) Color(0xFF2E7D32) else if (balance.netBalanceCents < 0) DebtRed else TextSecondary
+                                        color = if (balance.netBalanceCents > 0) SettledGreen else if (balance.netBalanceCents < 0) DebtRed else TextSecondary
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
                                     text = balance.memberName,
@@ -825,14 +800,14 @@ private fun BalancesTab(
                                     balance.netBalanceCents < 0 -> DebtRed
                                     else -> TextSecondary
                                 }
-                                Text(statusText, fontSize = 12.sp, color = statusColor, fontWeight = FontWeight.SemiBold)
+                                Text(statusText, fontSize = 13.sp, color = statusColor, fontWeight = FontWeight.SemiBold)
                             }
                         }
 
                         // WhatsApp Member Bill Button
                         IconButton(
                             onClick = {
-                                val memberExpenses = mutableListOf<Pair<Expense, Long>>()
+                                val memberExpenses = mutableListOf<Pair<ExpenseData, Long>>()
                                 for (exp in expenses) {
                                     val part = exp.participants.firstOrNull { it.memberId == balance.memberId }
                                     if (part != null) memberExpenses.add(exp to part.amountCents)
@@ -915,68 +890,197 @@ private fun BalancesTab(
 private fun TotalsTab(
     currency: String,
     totalSpendingCents: Long,
-    expenses: List<Expense>,
+    expenses: List<ExpenseData>,
     balances: List<com.babysplit.app.feature.balance.domain.engine.MemberBalanceSummary>
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 1. Total Spending Hero Card
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = ChickYellowLight),
+                border = BorderStroke(1.dp, ChickGold)
             ) {
-                Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Total Group Spending", fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Spacer(modifier = Modifier.height(4.dp))
+                Column(
+                    modifier = Modifier.padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        BillSummaryFormatter.formatCents(totalSpendingCents, currency),
-                        fontSize = 28.sp,
+                        text = "TOTAL TRIP EXPENSES",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = TurquoiseDark,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = BillSummaryFormatter.formatCents(totalSpendingCents, currency),
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = ChickAmber
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val nonSettlements = expenses.filter { !it.isSettlement }
+                    Text(
+                        text = "${nonSettlements.size} expense${if (nonSettlements.size != 1) "s" else ""} recorded",
+                        fontSize = 12.sp,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
         }
 
+        // 2. Spending By Category
         item {
-            Text("Spending By Category", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("📊 Spending by Category", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
         }
 
-        val categoryGroups = expenses.filter { !it.isSettlement }.groupBy { it.category }
-        items(categoryGroups.entries.toList()) { (cat, exps) ->
-            val sum = exps.sumOf { it.totalAmountCents }
-            val percent = if (totalSpendingCents > 0) (sum.toFloat() / totalSpendingCents * 100).toInt() else 0
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+        val categoryGroups = expenses.filter { !it.isSettlement }.groupBy { ExpenseCategory.fromName(it.categoryName) }
+        if (categoryGroups.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                    border = BorderStroke(1.dp, SurfaceBorderLight)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(cat.emoji, fontSize = 20.sp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(cat.displayName, fontWeight = FontWeight.Medium)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No spending categories to display yet", color = TextSecondary, fontSize = 13.sp)
                     }
-                    Text("${BillSummaryFormatter.formatCents(sum, currency)} ($percent%)", fontWeight = FontWeight.Bold)
+                }
+            }
+        } else {
+            items(categoryGroups.entries.sortedByDescending { it.value.sumOf { exp -> exp.totalAmountCents } }) { (cat, exps) ->
+                val sum = exps.sumOf { it.totalAmountCents }
+                val progress = if (totalSpendingCents > 0) (sum.toFloat() / totalSpendingCents) else 0f
+                val percent = (progress * 100).toInt()
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                    border = BorderStroke(1.dp, SurfaceBorderLight)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = ChickYellowLight,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(cat.emoji, fontSize = 18.sp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(cat.displayName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                                    Text("${exps.size} item${if (exps.size != 1) "s" else ""}", fontSize = 11.sp, color = TextSecondary)
+                                }
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = BillSummaryFormatter.formatCents(sum, currency),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp,
+                                    color = ChickAmber
+                                )
+                                Text("$percent%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                            }
+                        }
+
+                        // Progress Bar
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = ChickAmber,
+                            trackColor = ChickYellowSubtle
+                        )
+                    }
                 }
             }
         }
+
+        // 3. Top Contributors
+        if (balances.isNotEmpty() && totalSpendingCents > 0) {
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("🏆 Top Paid Upfront", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
+            }
+
+            items(balances.filter { it.totalPaidCents > 0 }.sortedByDescending { it.totalPaidCents }) { b ->
+                val paidPercent = if (totalSpendingCents > 0) (b.totalPaidCents.toFloat() / totalSpendingCents * 100).toInt() else 0
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                    border = BorderStroke(1.dp, SurfaceBorderLight)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = BackgroundLight,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(b.memberName.take(1).uppercase(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(b.memberName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPrimary)
+                        }
+                        Text(
+                            "${BillSummaryFormatter.formatCents(b.totalPaidCents, currency)} ($paidPercent%)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = SettledGreen
+                        )
+                    }
+                }
+            }
+        }
+
         item { Spacer(modifier = Modifier.height(40.dp)) }
     }
 }
 
 @Composable
 fun EditMemberPaymentDialog(
-    member: MemberEntity,
+    member: MemberData,
     onDismiss: () -> Unit,
-    onConfirm: (MemberEntity) -> Unit
+    onConfirm: (MemberData) -> Unit
 ) {
     var bankName by remember(member) { mutableStateOf(member.bankName ?: "") }
     var holderName by remember(member) { mutableStateOf(member.accountHolderName ?: member.name) }
@@ -1064,4 +1168,5 @@ fun EditMemberPaymentDialog(
         }
     )
 }
+
 
