@@ -44,31 +44,70 @@ fun AddEditExpenseScreen(
     groupId: Long,
     currency: String,
     members: List<MemberEntity>,
+    existingExpense: com.babysplit.app.core.database.dao.ExpenseWithParticipants? = null,
     onBackClick: () -> Unit,
-    onSaveExpense: (Expense) -> Unit
+    onSaveExpense: (Expense) -> Unit,
+    onDeleteExpense: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
-    var title by remember { mutableStateOf("") }
-    var amountInput by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(ExpenseCategory.FOOD) }
-    var paidByMemberId by remember { mutableStateOf(members.firstOrNull()?.id ?: 0L) }
-    var splitType by remember { mutableStateOf(SplitType.EQUAL) }
-    var note by remember { mutableStateOf("") }
-    var receiptPath by remember { mutableStateOf<String?>(null) }
+    var title by remember(existingExpense) {
+        mutableStateOf(existingExpense?.expense?.title ?: "")
+    }
+    var amountInput by remember(existingExpense) {
+        mutableStateOf(
+            if (existingExpense != null) {
+                val cents = existingExpense.expense.totalAmountCents
+                if (currency in listOf("IDR", "VND", "JPY")) (cents / 100).toString() else String.format(java.util.Locale.US, "%.2f", cents / 100.0)
+            } else ""
+        )
+    }
+    var selectedCategory by remember(existingExpense) {
+        mutableStateOf(
+            if (existingExpense != null) ExpenseCategory.fromName(existingExpense.expense.categoryName) else ExpenseCategory.FOOD
+        )
+    }
+    var paidByMemberId by remember(members, existingExpense) {
+        mutableStateOf(existingExpense?.expense?.paidByMemberId ?: members.firstOrNull()?.id ?: 0L)
+    }
+    var splitType by remember(existingExpense) {
+        mutableStateOf(
+            if (existingExpense != null) {
+                try { SplitType.valueOf(existingExpense.expense.splitType) } catch (e: Exception) { SplitType.EQUAL }
+            } else SplitType.EQUAL
+        )
+    }
+    var note by remember(existingExpense) {
+        mutableStateOf(existingExpense?.expense?.note ?: "")
+    }
+    var receiptPath by remember(existingExpense) {
+        mutableStateOf<String?>(existingExpense?.expense?.receiptImagePath)
+    }
+
+    LaunchedEffect(members) {
+        if (paidByMemberId == 0L && members.isNotEmpty()) {
+            paidByMemberId = members.first().id
+        }
+    }
 
     // Equal split member selection map (id -> included)
-    val equalSelectionMap = remember(members) {
+    val equalSelectionMap = remember(members, existingExpense) {
         mutableStateMapOf<Long, Boolean>().apply {
-            members.forEach { put(it.id, true) }
+            members.forEach { m ->
+                put(m.id, existingExpense == null || existingExpense.participants.any { it.memberId == m.id })
+            }
         }
     }
 
     // Input state map for custom split types
-    val memberInputs = remember(members) {
+    val memberInputs = remember(members, existingExpense) {
         mutableStateMapOf<Long, String>().apply {
-            members.forEach { put(it.id, "1") }
+            members.forEach { m ->
+                val p = existingExpense?.participants?.firstOrNull { it.memberId == m.id }
+                put(m.id, p?.rawShareValue?.toString() ?: (if (splitType == SplitType.PERCENTAGE) (100.0 / members.size.coerceAtLeast(1)).toInt().toString() else "1"))
+            }
         }
     }
 
@@ -125,8 +164,12 @@ fun AddEditExpenseScreen(
         splitType,
         memberInputs.toMap(),
         equalSelectionMap.toMap(),
-        members
+        members,
+        paidByMemberId
     ) {
+        if (paidByMemberId == 0L || !members.any { it.id == paidByMemberId }) {
+            return@remember Triple(emptyList(), false, "Please select who paid for this expense.")
+        }
         if (totalAmountCents <= 0) {
             return@remember Triple(emptyList(), false, "Please enter an expense amount.")
         }
@@ -138,60 +181,92 @@ fun AddEditExpenseScreen(
                     Triple(emptyList(), false, "Select at least 1 person to split with.")
                 } else {
                     val inputs = activeMembers.map { SplitCalculator.MemberInput(it.id, it.name, 1.0) }
-                    val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.EQUAL)
-                    Triple(parts, true, null)
+                    val result = SplitCalculator.calculateSplit(
+                        totalAmountCents = totalAmountCents,
+                        splitType = SplitType.EQUAL,
+                        memberInputs = inputs
+                    )
+                    Triple(result.participants, result.isValid, result.validationError)
                 }
             }
             SplitType.PERCENTAGE -> {
-                val sumPct = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
-                val remainingPct = 100.0 - sumPct
-                val isValid = abs(remainingPct) < 0.01
                 val inputs = members.map {
-                    SplitCalculator.MemberInput(it.id, it.name, memberInputs[it.id]?.toDoubleOrNull() ?: 0.0)
+                    val pct = memberInputs[it.id]?.toDoubleOrNull() ?: 0.0
+                    SplitCalculator.MemberInput(it.id, it.name, pct)
                 }
-                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.PERCENTAGE)
-                val msg = if (!isValid) {
-                    val formattedSum = if (sumPct % 1.0 == 0.0) sumPct.toInt().toString() else String.format(java.util.Locale.US, "%.1f", sumPct)
-                    val formattedRem = if (remainingPct % 1.0 == 0.0) remainingPct.toInt().toString() else String.format(java.util.Locale.US, "%.1f", remainingPct)
-                    "⚠️ Total is $formattedSum% ($formattedRem% remaining). Must equal 100%."
+                val result = SplitCalculator.calculateSplit(
+                    totalAmountCents = totalAmountCents,
+                    splitType = SplitType.PERCENTAGE,
+                    memberInputs = inputs
+                )
+                val sumPct = inputs.sumOf { it.shareValue }
+                val errorMsg = if (!result.isValid) {
+                    val diff = 100.0 - sumPct
+                    "Total percent is ${String.format(java.util.Locale.US, "%.1f", sumPct)}% (needs ${if (diff > 0) "+${String.format(java.util.Locale.US, "%.1f", diff)}%" else "${String.format(java.util.Locale.US, "%.1f", diff)}%"})"
                 } else null
-                Triple(parts, isValid, msg)
+                Triple(result.participants, result.isValid, errorMsg)
             }
             SplitType.EXACT -> {
-                val sumExactDollars = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
-                val sumExactCents = (sumExactDollars * 100).roundToLong()
-                val diffCents = totalAmountCents - sumExactCents
-                val isValid = diffCents == 0L
                 val inputs = members.map {
-                    val cents = ((memberInputs[it.id]?.toDoubleOrNull() ?: 0.0) * 100).roundToLong()
-                    SplitCalculator.MemberInput(it.id, it.name, cents.toDouble())
+                    val exactAmt = memberInputs[it.id]?.toDoubleOrNull() ?: 0.0
+                    SplitCalculator.MemberInput(it.id, it.name, exactAmt * 100)
                 }
-                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.EXACT)
-                val msg = if (!isValid) {
-                    "⚠️ Allocated: ${BillSummaryFormatter.formatCents(sumExactCents, currency)} (${BillSummaryFormatter.formatCents(diffCents, currency)} remaining)."
+                val result = SplitCalculator.calculateSplit(
+                    totalAmountCents = totalAmountCents,
+                    splitType = SplitType.EXACT,
+                    memberInputs = inputs
+                )
+                val sumExactCents = inputs.sumOf { it.shareValue.toLong() }
+                val errorMsg = if (!result.isValid) {
+                    val diffCents = totalAmountCents - sumExactCents
+                    "Total assigned is ${BillSummaryFormatter.formatCents(sumExactCents, currency)} (${if (diffCents > 0) "remaining ${BillSummaryFormatter.formatCents(diffCents, currency)}" else "over by ${BillSummaryFormatter.formatCents(-diffCents, currency)}"})"
                 } else null
-                Triple(parts, isValid, msg)
+                Triple(result.participants, result.isValid, errorMsg)
             }
             SplitType.SHARE -> {
-                val sumShares = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
-                val isValid = sumShares > 0.0
                 val inputs = members.map {
-                    SplitCalculator.MemberInput(it.id, it.name, memberInputs[it.id]?.toDoubleOrNull() ?: 0.0)
+                    val share = memberInputs[it.id]?.toDoubleOrNull() ?: 0.0
+                    SplitCalculator.MemberInput(it.id, it.name, share)
                 }
-                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.SHARE)
-                val msg = if (!isValid) "⚠️ Total shares must be greater than 0." else null
-                Triple(parts, isValid, msg)
+                val result = SplitCalculator.calculateSplit(
+                    totalAmountCents = totalAmountCents,
+                    splitType = SplitType.SHARE,
+                    memberInputs = inputs
+                )
+                Triple(result.participants, result.isValid, result.validationError)
             }
             SplitType.ADJUSTMENT -> {
                 val inputs = members.map {
-                    val adjCents = ((memberInputs[it.id]?.toDoubleOrNull() ?: 0.0) * 100).roundToLong()
-                    SplitCalculator.MemberInput(it.id, it.name, adjCents.toDouble())
+                    val adj = memberInputs[it.id]?.toDoubleOrNull() ?: 0.0
+                    SplitCalculator.MemberInput(it.id, it.name, adj * 100)
                 }
-                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.ADJUSTMENT)
-                Triple(parts, true, null)
+                val result = SplitCalculator.calculateSplit(
+                    totalAmountCents = totalAmountCents,
+                    splitType = SplitType.ADJUSTMENT,
+                    memberInputs = inputs
+                )
+                Triple(result.participants, result.isValid, result.validationError)
             }
             else -> Triple(emptyList(), false, null)
         }
+    }
+
+    if (showDeleteConfirmDialog && existingExpense != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("Delete Expense") },
+            text = { Text("Are you sure you want to delete this expense? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteExpense?.invoke(existingExpense.expense.id)
+                    showDeleteConfirmDialog = false
+                    onBackClick()
+                }) { Text("Delete", color = DebtRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     Scaffold(
@@ -202,10 +277,17 @@ fun AddEditExpenseScreen(
             .imePadding(),
         topBar = {
             TopAppBar(
-                title = { Text("Add Expense 💸", fontWeight = FontWeight.Bold) },
+                title = { Text(if (existingExpense != null) "Edit Expense ✏️" else "Add Expense 💸", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    if (existingExpense != null && onDeleteExpense != null) {
+                        IconButton(onClick = { showDeleteConfirmDialog = true }) {
+                            Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete Expense", tint = DebtRed)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundLight)
@@ -235,6 +317,7 @@ fun AddEditExpenseScreen(
                         onClick = {
                             val paidByName = members.firstOrNull { it.id == paidByMemberId }?.name ?: "Host"
                             val expense = Expense(
+                                id = existingExpense?.expense?.id ?: java.util.UUID.randomUUID().toString(),
                                 groupId = groupId,
                                 title = title.ifBlank { selectedCategory.displayName },
                                 totalAmountCents = totalAmountCents,
@@ -253,18 +336,14 @@ fun AddEditExpenseScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         shape = RoundedCornerShape(14.dp),
-                        enabled = totalAmountCents > 0 && isValidSplit,
+                        enabled = totalAmountCents > 0 && isValidSplit && paidByMemberId != 0L,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = ChickAmber,
                             disabledContainerColor = SurfaceBorderLight,
                             contentColor = Color.White
                         )
                     ) {
-                        Text(
-                            text = if (isValidSplit && totalAmountCents > 0) "💾 Save Expense (${BillSummaryFormatter.formatCents(totalAmountCents, currency)})" else "Save Expense",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(if (existingExpense != null) "Update Expense 💾" else "Save Expense 💸", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }

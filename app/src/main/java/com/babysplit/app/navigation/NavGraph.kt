@@ -53,7 +53,12 @@ fun NavGraph(
                     navController.navigate(Screen.GroupDetail.createRoute(groupId))
                 },
                 onCreateGroupClick = { showCreateGroupDialog = true },
-                onProfileClick = { navController.navigate(Screen.Profile.route) }
+                onProfileClick = { navController.navigate(Screen.Profile.route) },
+                onDeleteGroup = { gId ->
+                    scope.launch {
+                        database.groupDao().deleteFullGroup(gId)
+                    }
+                }
             )
 
             if (showCreateGroupDialog) {
@@ -159,6 +164,20 @@ fun NavGraph(
                     scope.launch {
                         tripLifecycleManager.finishTrip(context, groupId, paymentDetails)
                     }
+                },
+                onDeleteTrip = {
+                    scope.launch {
+                        database.groupDao().deleteFullGroup(groupId)
+                        navController.popBackStack()
+                    }
+                },
+                onEditExpense = { gId, expId ->
+                    navController.navigate(Screen.AddEditExpense.createRoute(gId, expId))
+                },
+                onDeleteExpense = { expId ->
+                    scope.launch {
+                        database.expenseDao().deleteFullExpense(expId)
+                    }
                 }
             )
         }
@@ -175,14 +194,29 @@ fun NavGraph(
             )
         ) { backStackEntry ->
             val groupId = backStackEntry.arguments?.getLong("groupId") ?: 0L
+            val expenseId = backStackEntry.arguments?.getString("expenseId")
             val group by database.groupDao().getGroupById(groupId).collectAsState(initial = null)
             val members by database.memberDao().getMembersForGroup(groupId).collectAsState(initial = emptyList())
+            var existingExpense by remember { mutableStateOf<ExpenseWithParticipants?>(null) }
+
+            LaunchedEffect(expenseId) {
+                if (!expenseId.isNullOrBlank()) {
+                    existingExpense = database.expenseDao().getExpenseWithParticipantsDirect(expenseId)
+                }
+            }
 
             AddEditExpenseScreen(
                 groupId = groupId,
                 currency = group?.currency ?: "USD",
                 members = members,
+                existingExpense = existingExpense,
                 onBackClick = { navController.popBackStack() },
+                onDeleteExpense = { expId ->
+                    scope.launch {
+                        database.expenseDao().deleteFullExpense(expId)
+                        navController.popBackStack()
+                    }
+                },
                 onSaveExpense = { expense ->
                     scope.launch {
                         database.expenseDao().insertFullExpense(

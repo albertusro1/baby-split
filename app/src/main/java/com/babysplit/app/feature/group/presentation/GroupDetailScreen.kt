@@ -57,7 +57,10 @@ fun GroupDetailScreen(
     onAddMember: (name: String, type: String, email: String?, phone: String?, bankName: String?, holderName: String?, bankAcc: String?, walletName: String?, walletHandle: String?) -> Unit,
     onUpdateMember: (MemberEntity) -> Unit = {},
     onRecordSettlement: (paidByMemberId: Long, paidToMemberId: Long, amountCents: Long) -> Unit,
-    onFinishTrip: () -> Unit
+    onFinishTrip: () -> Unit,
+    onDeleteTrip: () -> Unit = {},
+    onEditExpense: (groupId: Long, expenseId: String) -> Unit = { _, _ -> },
+    onDeleteExpense: (expenseId: String) -> Unit = {}
 ) {
     if (group == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -72,6 +75,7 @@ fun GroupDetailScreen(
     var editingPaymentMember by remember { mutableStateOf<MemberEntity?>(null) }
     var showSettlementDialog by remember { mutableStateOf(false) }
     var showFinishTripDialog by remember { mutableStateOf(false) }
+    var showDeleteTripDialog by remember { mutableStateOf(false) }
 
     val tabs = listOf("Expenses", "Balances & Settle", "Totals")
     val memberMap = remember(members) { members.associate { it.id to it.name } }
@@ -144,6 +148,9 @@ fun GroupDetailScreen(
                             Icon(Icons.Filled.CheckCircle, contentDescription = "Finish Trip", tint = SettledGreen)
                         }
                     }
+                    IconButton(onClick = { showDeleteTripDialog = true }) {
+                        Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete Trip", tint = DebtRed)
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundLight)
             )
@@ -189,6 +196,8 @@ fun GroupDetailScreen(
                 0 -> ExpensesTab(
                     expenses = expenses,
                     currency = group.currency,
+                    onEditExpense = { expId -> onEditExpense(group.id, expId) },
+                    onDeleteExpense = onDeleteExpense,
                     onShareSingleExpense = { exp ->
                         val sb = java.lang.StringBuilder()
                         sb.appendLine("🧾 *${group.name} - Expense Split*")
@@ -245,6 +254,41 @@ fun GroupDetailScreen(
                 )
             }
         }
+    }
+
+    if (showDeleteTripDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteTripDialog = false },
+            containerColor = SurfaceLight,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("Delete Trip? 🗑️", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+            },
+            text = {
+                Text(
+                    "Are you sure you want to delete '${group.emoji} ${group.name}'? All expenses, member records, and settlements in this trip will be permanently removed.",
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteTripDialog = false
+                        onDeleteTrip()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DebtRed, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Delete Trip", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteTripDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
     }
 
     if (showAddMemberDialog) {
@@ -319,9 +363,12 @@ fun GroupDetailScreen(
 private fun ExpensesTab(
     expenses: List<Expense>,
     currency: String,
+    onEditExpense: (String) -> Unit = {},
+    onDeleteExpense: (String) -> Unit = {},
     onShareSingleExpense: (Expense) -> Unit
 ) {
     var viewingReceiptPath by remember { mutableStateOf<String?>(null) }
+    var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
 
     if (expenses.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -375,11 +422,18 @@ private fun ExpensesTab(
                             Text(
                                 BillSummaryFormatter.formatCents(expense.totalAmountCents, expense.currency),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
+                                fontSize = 14.sp,
                                 color = ChickAmber
                             )
-                            IconButton(onClick = { onShareSingleExpense(expense) }) {
-                                Icon(Icons.Filled.Share, contentDescription = "Share", tint = WhatsAppGreen)
+                            Spacer(modifier = Modifier.width(2.dp))
+                            IconButton(onClick = { onEditExpense(expense.id) }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = ChickAmber, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = { expenseToDelete = expense }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete", tint = DebtRed, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = { onShareSingleExpense(expense) }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Filled.Share, contentDescription = "Share", tint = WhatsAppGreen, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -457,6 +511,44 @@ private fun ExpensesTab(
                     colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White)
                 ) {
                     Text("Done")
+                }
+            }
+        )
+    }
+
+    if (expenseToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { expenseToDelete = null },
+            containerColor = SurfaceLight,
+            shape = RoundedCornerShape(18.dp),
+            title = {
+                Text("Delete Expense? 🗑️", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+            },
+            text = {
+                Text(
+                    "Are you sure you want to delete '${expenseToDelete?.title}' (${expenseToDelete?.let { BillSummaryFormatter.formatCents(it.totalAmountCents, it.currency) }})? This will recalculate all group balances.",
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val expId = expenseToDelete?.id
+                        if (expId != null) {
+                            onDeleteExpense(expId)
+                        }
+                        expenseToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DebtRed, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { expenseToDelete = null }) {
+                    Text("Cancel", color = TextSecondary)
                 }
             }
         )

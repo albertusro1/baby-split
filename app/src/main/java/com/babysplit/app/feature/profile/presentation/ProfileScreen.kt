@@ -275,41 +275,70 @@ fun ProfileScreen(
     var showRestorePromptDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val accountPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
+            val selectedEmail = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
+            if (!selectedEmail.isNullOrBlank()) {
+                inputGoogleEmail = selectedEmail
+                val derivedName = selectedEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
+                inputGoogleName = derivedName
+
+                isScanningDrive = true
+                scope.launch {
+                    val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, selectedEmail)
+                    isScanningDrive = false
+                    showGoogleAuthDialog = false
+                    onSaveUserProfile(derivedName, selectedEmail)
+
+                    if (backups.isNotEmpty()) {
+                        discoveredBackups = backups
+                        showRestorePromptDialog = true
+                    }
+                }
+            }
+        }
+    }
+
     if (showGoogleAuthDialog) {
         AlertDialog(
             onDismissRequest = { if (!isScanningDrive) showGoogleAuthDialog = false },
             containerColor = SurfaceLight,
             shape = RoundedCornerShape(20.dp),
             title = {
-                Text("☁️ Google Account Sign-In", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+                Text("☁️ Connect Google Account", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Sign in to automatically sync your trip expenses and search for previous Google Drive backups.",
+                        "Select your Google Account to automatically sync trip records, receipts, and discover previous Drive backups.",
                         fontSize = 13.sp,
                         color = TextSecondary
                     )
 
-                    OutlinedButton(
+                    Button(
                         onClick = {
-                            val intent = android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse("https://accounts.google.com/")
-                            )
-                            context.startActivity(intent)
+                            val pickerIntent = com.babysplit.app.core.auth.GoogleAuthManager.createGoogleAccountPickerIntent()
+                            accountPickerLauncher.launch(pickerIntent)
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(Icons.Filled.OpenInBrowser, contentDescription = null, tint = ChickAmber)
+                        Icon(Icons.Filled.AccountCircle, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Open Google in Browser 🌐", fontSize = 13.sp, color = TextPrimary)
+                        Text("Select Account on Device 📱", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = SurfaceBorderLight)
-
-                    Text("Enter your Google Account email to link:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = SurfaceBorderLight)
+                        Text(" or enter manually ", fontSize = 11.sp, color = TextSecondary)
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = SurfaceBorderLight)
+                    }
 
                     OutlinedTextField(
                         value = inputGoogleEmail,

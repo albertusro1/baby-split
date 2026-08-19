@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.core.database.dao
+package com.babysplit.app.core.database.dao
 
 import androidx.room.*
 import com.babysplit.app.core.database.entity.GroupEntity
@@ -23,4 +23,20 @@ interface GroupDao {
 
     @Delete
     suspend fun deleteGroup(group: GroupEntity)
+
+    @Query("DELETE FROM groups WHERE id = :groupId")
+    suspend fun deleteGroupById(groupId: Long)
+
+    @Query("DELETE FROM members WHERE groupId = :groupId")
+    suspend fun deleteMembersForGroup(groupId: Long)
+
+    @Query("DELETE FROM expenses WHERE groupId = :groupId")
+    suspend fun deleteExpensesForGroup(groupId: Long)
+
+    @Transaction
+    suspend fun deleteFullGroup(groupId: Long) {
+        deleteExpensesForGroup(groupId)
+        deleteMembersForGroup(groupId)
+        deleteGroupById(groupId)
+    }
 }

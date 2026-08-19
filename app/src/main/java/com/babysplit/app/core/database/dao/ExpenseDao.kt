@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.core.database.dao
+package com.babysplit.app.core.database.dao
 
 import androidx.room.*
 import com.babysplit.app.core.database.entity.ExpenseEntity
@@ -45,4 +45,20 @@ interface ExpenseDao {
 
     @Delete
     suspend fun deleteExpense(expense: ExpenseEntity)
+
+    @Query("SELECT * FROM expenses WHERE id = :expenseId")
+    fun getExpenseById(expenseId: String): Flow<ExpenseEntity?>
+
+    @Transaction
+    @Query("SELECT * FROM expenses WHERE id = :expenseId")
+    suspend fun getExpenseWithParticipantsDirect(expenseId: String): ExpenseWithParticipants?
+
+    @Query("DELETE FROM expenses WHERE id = :expenseId")
+    suspend fun deleteExpenseById(expenseId: String)
+
+    @Transaction
+    suspend fun deleteFullExpense(expenseId: String) {
+        deleteParticipantsForExpense(expenseId)
+        deleteExpenseById(expenseId)
+    }
 }

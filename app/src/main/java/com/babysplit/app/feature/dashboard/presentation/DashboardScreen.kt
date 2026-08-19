@@ -28,8 +28,11 @@ fun DashboardScreen(
     userName: String = "Guest",
     onGroupClick: (Long) -> Unit,
     onCreateGroupClick: () -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onDeleteGroup: (Long) -> Unit = {}
 ) {
+    var groupToDelete by remember { mutableStateOf<GroupEntity?>(null) }
+
     Scaffold(
         containerColor = BackgroundLight,
         topBar = {
@@ -190,7 +193,7 @@ fun DashboardScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
+                                .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -198,18 +201,18 @@ fun DashboardScreen(
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = ChickYellowLight,
-                                    modifier = Modifier.size(52.dp)
+                                    modifier = Modifier.size(50.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Text(group.emoji, fontSize = 26.sp)
+                                        Text(group.emoji, fontSize = 24.sp)
                                     }
                                 }
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
                                         text = group.name,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp,
+                                        fontSize = 15.sp,
                                         color = TextPrimary
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -230,12 +233,25 @@ fun DashboardScreen(
                                     }
                                 }
                             }
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = TextTertiary,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { groupToDelete = group },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.DeleteOutline,
+                                        contentDescription = "Delete Trip",
+                                        tint = DebtRed.copy(alpha = 0.8f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    tint = TextTertiary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -243,5 +259,42 @@ fun DashboardScreen(
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
-}
 
+    if (groupToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { groupToDelete = null },
+            containerColor = SurfaceLight,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("Delete Trip? 🗑️", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+            },
+            text = {
+                Text(
+                    "Are you sure you want to delete '${groupToDelete?.emoji} ${groupToDelete?.name}'? All expenses, member records, and receipts in this trip will be permanently removed.",
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val gId = groupToDelete?.id
+                        if (gId != null) {
+                            onDeleteGroup(gId)
+                        }
+                        groupToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DebtRed, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Delete Trip", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { groupToDelete = null }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+}
