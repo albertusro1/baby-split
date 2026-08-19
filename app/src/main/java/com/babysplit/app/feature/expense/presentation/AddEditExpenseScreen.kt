@@ -33,6 +33,7 @@ import com.babysplit.app.core.whatsapp.BillSummaryFormatter
 import com.babysplit.app.feature.expense.domain.engine.SplitCalculator
 import com.babysplit.app.feature.expense.domain.model.Expense
 import com.babysplit.app.feature.expense.domain.model.ExpenseCategory
+import com.babysplit.app.feature.expense.domain.model.ExpenseParticipant
 import com.babysplit.app.feature.expense.domain.model.SplitType
 import kotlinx.coroutines.launch
 import kotlin.math.abs
