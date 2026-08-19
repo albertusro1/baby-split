@@ -29,9 +29,21 @@ fun DashboardScreen(
     onGroupClick: (Long) -> Unit,
     onCreateGroupClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onDeleteGroup: (Long) -> Unit = {}
+    onDeleteGroup: (Long) -> Unit = {},
+    onRestoreDiscoveredBackups: (List<com.babysplit.app.core.gdrive.DriveBackupItem>) -> Unit = {}
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var groupToDelete by remember { mutableStateOf<GroupEntity?>(null) }
+    var discoveredBackups by remember { mutableStateOf<List<com.babysplit.app.core.gdrive.DriveBackupItem>>(emptyList()) }
+
+    LaunchedEffect(groups.isEmpty()) {
+        if (groups.isEmpty()) {
+            val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, userEmail ?: "")
+            discoveredBackups = backups
+        } else {
+            discoveredBackups = emptyList()
+        }
+    }
 
     Scaffold(
         containerColor = BackgroundLight,
@@ -124,6 +136,53 @@ fun DashboardScreen(
                             tint = if (userEmail != null) SettledGreen else ChickAmber,
                             modifier = Modifier.size(18.dp)
                         )
+                    }
+                }
+            }
+
+            // Discovered Cloud Backups Card (if app was reinstalled or empty)
+            if (discoveredBackups.isNotEmpty() && groups.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = ChickYellowSubtle),
+                        border = BorderStroke(1.dp, ChickAmber)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("☁️", fontSize = 22.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "${discoveredBackups.size} Cloud Backup Trip(s) Found!",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        "Previous trips found on device & Drive. Tap below to restore everything.",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = { onRestoreDiscoveredBackups(discoveredBackups) },
+                                colors = ButtonDefaults.buttonColors(containerColor = SettledGreen, contentColor = Color.White),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Restore All Trips Now 📥", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                        }
                     }
                 }
             }

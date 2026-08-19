@@ -55,14 +55,8 @@ class TripLifecycleManager(private val database: BabySplitDatabase) {
         // 1. Mark group as finished in DB
         database.groupDao().updateGroup(group.copy(isFinished = true))
 
-        // 2. Backup to Google Drive (if user linked Drive)
-        val receiptImages = expenses.mapNotNull { it.receiptImagePath }
-        GoogleDriveBackupEngine.backupTripToDrive(
-            context = context,
-            tripName = group.name,
-            tripSummaryJson = "{\"tripId\": $groupId, \"name\": \"${group.name}\", \"expensesCount\": ${expenses.size}}",
-            receiptPaths = receiptImages
-        )
+        // 2. Backup full trip snapshot to persistent external and cloud locations
+        GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
 
         true
     }

@@ -59,6 +59,13 @@ fun NavGraph(
                     scope.launch {
                         database.groupDao().deleteFullGroup(gId)
                     }
+                },
+                onRestoreDiscoveredBackups = { backups ->
+                    scope.launch {
+                        for (backup in backups) {
+                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(database, backup)
+                        }
+                    }
                 }
             )
 
@@ -83,6 +90,7 @@ fun NavGraph(
                                     memberType = "HOST"
                                 )
                             )
+                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
                             showCreateGroupDialog = false
                             navController.navigate(Screen.GroupDetail.createRoute(groupId))
                         }
@@ -125,11 +133,13 @@ fun NavGraph(
                                 eWalletHandle = walletHandle
                             )
                         )
+                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
                     }
                 },
                 onUpdateMember = { updatedMember ->
                     scope.launch {
                         database.memberDao().updateMember(updatedMember)
+                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, updatedMember.groupId)
                     }
                 },
                 onRecordSettlement = { payerId, receiverId, amountCents ->
@@ -159,6 +169,7 @@ fun NavGraph(
                                 )
                             )
                         )
+                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
                     }
                 },
                 onFinishTrip = {
@@ -178,6 +189,7 @@ fun NavGraph(
                 onDeleteExpense = { expId ->
                     scope.launch {
                         database.expenseDao().deleteFullExpense(expId)
+                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
                     }
                 }
             )
@@ -215,6 +227,7 @@ fun NavGraph(
                 onDeleteExpense = { expId ->
                     scope.launch {
                         database.expenseDao().deleteFullExpense(expId)
+                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
                         navController.popBackStack()
                     }
                 },
@@ -246,6 +259,7 @@ fun NavGraph(
                                 )
                             }
                         )
+                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, groupId)
                         navController.popBackStack()
                     }
                 }
