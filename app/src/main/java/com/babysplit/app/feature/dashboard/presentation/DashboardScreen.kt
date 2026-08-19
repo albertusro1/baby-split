@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.feature.dashboard.presentation
+package com.babysplit.app.feature.dashboard.presentation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,7 +31,9 @@ fun DashboardScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("👶 Baby Split", fontWeight = FontWeight.Bold)
+                        Text("🐥", fontSize = 24.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Baby Split", fontWeight = FontWeight.Bold)
                     }
                 },
                 actions = {
