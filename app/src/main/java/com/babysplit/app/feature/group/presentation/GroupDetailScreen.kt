@@ -1,6 +1,7 @@
 package com.babysplit.app.feature.group.presentation
 
 import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,14 +15,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.babysplit.app.core.database.dao.ExpenseWithParticipants
 import com.babysplit.app.core.database.entity.GroupEntity
 import com.babysplit.app.core.database.entity.MemberEntity
+import com.babysplit.app.core.ui.theme.*
 import com.babysplit.app.core.whatsapp.BillSummaryFormatter
 import com.babysplit.app.core.whatsapp.HostPaymentDetails
 import com.babysplit.app.core.whatsapp.WhatsAppShareHelper

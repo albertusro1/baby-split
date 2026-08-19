@@ -36,6 +36,7 @@ fun NavGraph(
     val paymentDetails by userPrefs.hostPaymentDetailsFlow.collectAsState(initial = null)
     val defaultCurrency by userPrefs.defaultCurrencyFlow.collectAsState(initial = "USD")
     val userEmail by userPrefs.userEmailFlow.collectAsState(initial = null)
+    val userName by userPrefs.userNameFlow.collectAsState(initial = "Guest")
 
     var showCreateGroupDialog by remember { mutableStateOf(false) }
 
