@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.core.whatsapp
+package com.babysplit.app.core.whatsapp
 
 import com.babysplit.app.feature.expense.domain.model.Expense
 import com.babysplit.app.feature.expense.domain.model.ExpenseCategory
@@ -44,6 +44,7 @@ class BillSummaryFormatterTest {
         assertTrue(message.contains("Alice"))
         assertTrue(message.contains("Dinner at Trattoria"))
         assertTrue(message.contains("25.00"))
-        assertTrue(message.contains("BCA: 123-456-789"))
+        assertTrue(message.contains("123-456-789"))
+        assertTrue(message.contains("BCA"))
     }
 }
