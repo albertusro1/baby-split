@@ -45,10 +45,35 @@ fun ProfileScreen(
     val popularCurrencies = listOf("IDR", "USD", "EUR", "SGD", "GBP", "JPY", "AUD")
     val popularWallets = listOf("GoPay", "OVO", "Dana", "ShopeePay", "PayPal")
 
-    var showGoogleAuthDialog by remember { mutableStateOf(false) }
-    var inputGoogleEmail by remember { mutableStateOf("") }
-    var inputGoogleName by remember { mutableStateOf("") }
+    var isScanningDrive by remember { mutableStateOf(false) }
+    var discoveredBackups by remember { mutableStateOf<List<com.babysplit.app.core.gdrive.DriveBackupItem>>(emptyList()) }
+    var showRestorePromptDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    val accountPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
+            val selectedEmail = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
+            if (!selectedEmail.isNullOrBlank()) {
+                val derivedName = selectedEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
+                onSaveUserProfile(derivedName, selectedEmail)
+
+                isScanningDrive = true
+                scope.launch {
+                    val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, selectedEmail)
+                    isScanningDrive = false
+                    if (backups.isNotEmpty()) {
+                        discoveredBackups = backups
+                        showRestorePromptDialog = true
+                    } else {
+                        android.widget.Toast.makeText(context, "Google account linked: $selectedEmail", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
 
     Scaffold(
         containerColor = BackgroundLight,
@@ -93,12 +118,44 @@ fun ProfileScreen(
                             Text("Signed in as: $userEmail", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                             Text("Your trip records, summaries & receipts are automatically archived to Google Drive.", fontSize = 12.sp, color = TextSecondary)
                             Spacer(modifier = Modifier.height(10.dp))
-                            OutlinedButton(
-                                onClick = onSignOutClick,
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = DebtRed),
-                                border = BorderStroke(1.dp, DebtRed)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Sign Out / Switch to Guest")
+                                Button(
+                                    onClick = {
+                                        if (!isScanningDrive) {
+                                            isScanningDrive = true
+                                            scope.launch {
+                                                val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, userEmail)
+                                                isScanningDrive = false
+                                                if (backups.isNotEmpty()) {
+                                                    discoveredBackups = backups
+                                                    showRestorePromptDialog = true
+                                                } else {
+                                                    android.widget.Toast.makeText(context, "No backup files found on device or Google Drive.", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SettledGreen, contentColor = Color.White),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    if (isScanningDrive) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                    } else {
+                                        Text("🔍 Restore Backups", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                OutlinedButton(
+                                    onClick = onSignOutClick,
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DebtRed),
+                                    border = BorderStroke(1.dp, DebtRed),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Sign Out", fontSize = 12.sp)
+                                }
                             }
                         } else {
                             Text(
@@ -108,11 +165,22 @@ fun ProfileScreen(
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
-                                onClick = { showGoogleAuthDialog = true },
+                                onClick = {
+                                    val pickerIntent = com.babysplit.app.core.auth.GoogleAuthManager.createGoogleAccountPickerIntent()
+                                    accountPickerLauncher.launch(pickerIntent)
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("🔗 Sign In with Google", fontWeight = FontWeight.Bold)
+                                if (isScanningDrive) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Searching Backups...", fontWeight = FontWeight.Bold)
+                                } else {
+                                    Icon(Icons.Filled.AccountCircle, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("🔗 Sign In with Google", fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
@@ -164,7 +232,7 @@ fun ProfileScreen(
                 }
             }
 
-            // 3. 📱 E-Wallet & QRIS Card
+            // 3. 📱 E-Wallet Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -173,14 +241,25 @@ fun ProfileScreen(
                     border = BorderStroke(1.dp, SurfaceBorderLight)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("📱 E-Wallet & QRIS Details", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        
+                        Text("📱 E-Wallet / QRIS Details", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("Optional: For members who prefer paying via e-wallets.", fontSize = 12.sp, color = TextSecondary)
+
+                        Text("Quick Select E-Wallet:", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextSecondary)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             popularWallets.take(3).forEach { w ->
                                 FilterChip(
-                                    selected = (walletName == w),
+                                    selected = (walletName.equals(w, ignoreCase = true)),
                                     onClick = { walletName = w },
-                                    label = { Text(w, fontSize = 12.sp) }
+                                    label = { Text(w, fontSize = 11.sp) }
+                                )
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            popularWallets.drop(3).forEach { w ->
+                                FilterChip(
+                                    selected = (walletName.equals(w, ignoreCase = true)),
+                                    onClick = { walletName = w },
+                                    label = { Text(w, fontSize = 11.sp) }
                                 )
                             }
                         }
@@ -189,7 +268,7 @@ fun ProfileScreen(
                             value = walletName,
                             onValueChange = { walletName = it },
                             label = { Text("E-Wallet Provider") },
-                            placeholder = { Text("e.g. GoPay, OVO, Dana, PayPal") },
+                            placeholder = { Text("e.g. GoPay, OVO, Dana, ShopeePay") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -197,8 +276,8 @@ fun ProfileScreen(
                         OutlinedTextField(
                             value = walletHandle,
                             onValueChange = { walletHandle = it },
-                            label = { Text("E-Wallet Phone / Handle / ID") },
-                            placeholder = { Text("e.g. 08123456789 or paypal.me/name") },
+                            label = { Text("E-Wallet Phone Number / ID") },
+                            placeholder = { Text("e.g. 081234567890") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
@@ -207,7 +286,7 @@ fun ProfileScreen(
                 }
             }
 
-            // 4. 📝 Transfer Note & Currency Card
+            // 4. 📝 Custom Payment Note
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -216,24 +295,47 @@ fun ProfileScreen(
                     border = BorderStroke(1.dp, SurfaceBorderLight)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("📝 Payment Note & Default Currency", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("📝 Custom Payment Instructions", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("Extra message appended to all split receipts (e.g. 'Please send proof of transfer').", fontSize = 12.sp, color = TextSecondary)
 
                         OutlinedTextField(
                             value = customNote,
                             onValueChange = { customNote = it },
-                            label = { Text("Custom Transfer Note") },
-                            placeholder = { Text("e.g. Please send transfer receipt screenshot via WA") },
+                            label = { Text("Custom Note") },
+                            placeholder = { Text("e.g. Tolong transfer sebelum besok siang ya guys!") },
+                            minLines = 2,
+                            maxLines = 4,
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
+                }
+            }
 
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Default Currency: $currency", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            // 5. 🌐 Default Currency Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                    border = BorderStroke(1.dp, SurfaceBorderLight)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("🌐 Default Trip Currency", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             popularCurrencies.take(4).forEach { c ->
                                 FilterChip(
                                     selected = (currency == c),
                                     onClick = { currency = c },
-                                    label = { Text(c) }
+                                    label = { Text(c, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            popularCurrencies.drop(4).forEach { c ->
+                                FilterChip(
+                                    selected = (currency == c),
+                                    onClick = { currency = c },
+                                    label = { Text(c, fontSize = 12.sp) }
                                 )
                             }
                         }
@@ -241,7 +343,7 @@ fun ProfileScreen(
                 }
             }
 
-            // 5. Save Button
+            // 6. Save Button
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
@@ -270,150 +372,14 @@ fun ProfileScreen(
         }
     }
 
-    var isScanningDrive by remember { mutableStateOf(false) }
-    var discoveredBackups by remember { mutableStateOf<List<com.babysplit.app.core.gdrive.DriveBackupItem>>(emptyList()) }
-    var showRestorePromptDialog by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    val accountPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
-            val selectedEmail = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
-            if (!selectedEmail.isNullOrBlank()) {
-                inputGoogleEmail = selectedEmail
-                val derivedName = selectedEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
-                inputGoogleName = derivedName
-
-                isScanningDrive = true
-                scope.launch {
-                    val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, selectedEmail)
-                    isScanningDrive = false
-                    showGoogleAuthDialog = false
-                    onSaveUserProfile(derivedName, selectedEmail)
-
-                    if (backups.isNotEmpty()) {
-                        discoveredBackups = backups
-                        showRestorePromptDialog = true
-                    }
-                }
-            }
-        }
-    }
-
-    if (showGoogleAuthDialog) {
-        AlertDialog(
-            onDismissRequest = { if (!isScanningDrive) showGoogleAuthDialog = false },
-            containerColor = SurfaceLight,
-            shape = RoundedCornerShape(20.dp),
-            title = {
-                Text("☁️ Connect Google Account", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        "Select your Google Account to automatically sync trip records, receipts, and discover previous Drive backups.",
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
-
-                    Button(
-                        onClick = {
-                            val pickerIntent = com.babysplit.app.core.auth.GoogleAuthManager.createGoogleAccountPickerIntent()
-                            accountPickerLauncher.launch(pickerIntent)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Filled.AccountCircle, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Select Account on Device 📱", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = SurfaceBorderLight)
-                        Text(" or enter manually ", fontSize = 11.sp, color = TextSecondary)
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = SurfaceBorderLight)
-                    }
-
-                    OutlinedTextField(
-                        value = inputGoogleEmail,
-                        onValueChange = { inputGoogleEmail = it },
-                        label = { Text("Google Email") },
-                        placeholder = { Text("yourname@gmail.com") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = inputGoogleName,
-                        onValueChange = { inputGoogleName = it },
-                        label = { Text("Display Name (Optional)") },
-                        placeholder = { Text("e.g. Rowan") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (isScanningDrive) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = ChickAmber, strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Searching Google Drive for backups...", fontSize = 12.sp, color = ChickAmber, fontWeight = FontWeight.Medium)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (inputGoogleEmail.isNotBlank() && !isScanningDrive) {
-                            isScanningDrive = true
-                            val name = inputGoogleName.ifBlank { inputGoogleEmail.substringBefore("@").replaceFirstChar { it.uppercase() } }
-                            val email = inputGoogleEmail.trim()
-
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, email)
-                                isScanningDrive = false
-                                showGoogleAuthDialog = false
-                                onSaveUserProfile(name, email)
-
-                                if (backups.isNotEmpty()) {
-                                    discoveredBackups = backups
-                                    showRestorePromptDialog = true
-                                }
-                            }
-                        }
-                    },
-                    enabled = inputGoogleEmail.isNotBlank() && inputGoogleEmail.contains("@") && !isScanningDrive,
-                    colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(if (isScanningDrive) "Searching Drive..." else "Link & Search Backups 🔍", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { if (!isScanningDrive) showGoogleAuthDialog = false }) {
-                    Text("Cancel", color = TextSecondary)
-                }
-            }
-        )
-    }
-
     // Found Existing Google Drive Backups Dialog
     if (showRestorePromptDialog) {
         AlertDialog(
-            onDismissRequest = { showRestorePromptDialog = false },
+            onDismissRequest = { /* Keep dialog visible until explicit user action */ },
+            properties = androidx.compose.ui.window.DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = false
+            ),
             containerColor = SurfaceLight,
             shape = RoundedCornerShape(20.dp),
             title = {
@@ -422,7 +388,7 @@ fun ProfileScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "We discovered previous Baby Split trip backup(s) linked to your Google Account:",
+                        "We discovered previous Baby Split trip backup(s) on your device / Google Drive:",
                         fontSize = 13.sp,
                         color = TextSecondary
                     )
@@ -439,8 +405,8 @@ fun ProfileScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
-                                    Text("✈️ ${item.tripName}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                                    Text("Trip Archive Backup", fontSize = 11.sp, color = TextSecondary)
+                                    Text("${item.emoji} ${item.tripName}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                                    Text("${item.membersCount} Members • ${item.expensesCount} Expenses", fontSize = 11.sp, color = TextSecondary)
                                 }
                                 Icon(Icons.Filled.CloudDone, contentDescription = null, tint = SettledGreen, modifier = Modifier.size(20.dp))
                             }
@@ -454,6 +420,7 @@ fun ProfileScreen(
                     onClick = {
                         onRestoreBackups(discoveredBackups)
                         showRestorePromptDialog = false
+                        android.widget.Toast.makeText(context, "Restored ${discoveredBackups.size} trip(s) successfully! 🎉", android.widget.Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SettledGreen, contentColor = Color.White),
                     shape = RoundedCornerShape(10.dp)
@@ -469,4 +436,3 @@ fun ProfileScreen(
         )
     }
 }
-
