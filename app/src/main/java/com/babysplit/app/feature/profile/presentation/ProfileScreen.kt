@@ -75,6 +75,44 @@ fun ProfileScreen(
         }
     }
 
+    val documentPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    val content = context.contentResolver.openInputStream(uri)?.use { stream ->
+                        stream.bufferedReader().readText()
+                    }
+                    if (!content.isNullOrBlank()) {
+                        val json = org.json.JSONObject(content)
+                        val name = json.optString("name", "Imported Trip")
+                        val emoji = json.optString("emoji", "✈️")
+                        val membersCount = json.optJSONArray("members")?.length() ?: 1
+                        val expensesCount = json.optJSONArray("expenses")?.length() ?: 0
+                        val timestamp = json.optLong("updatedAtEpochMs", json.optLong("createdAtEpochMs", System.currentTimeMillis()))
+
+                        val backupItem = com.babysplit.app.core.gdrive.DriveBackupItem(
+                            id = uri.toString(),
+                            tripName = name,
+                            emoji = emoji,
+                            timestampMs = timestamp,
+                            membersCount = membersCount,
+                            expensesCount = expensesCount,
+                            rawJson = content
+                        )
+                        discoveredBackups = listOf(backupItem)
+                        showRestorePromptDialog = true
+                    } else {
+                        android.widget.Toast.makeText(context, "Selected backup file is empty.", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(context, "Failed to read backup file: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     Scaffold(
         containerColor = BackgroundLight,
         topBar = {
@@ -182,6 +220,19 @@ fun ProfileScreen(
                                     Text("🔗 Sign In with Google", fontWeight = FontWeight.Bold)
                                 }
                             }
+                        }
+
+                        // Manual File Picker Option
+                        OutlinedButton(
+                            onClick = { documentPickerLauncher.launch(arrayOf("application/json", "*/*")) },
+                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ChickGold),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ChickAmber)
+                        ) {
+                            Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("📂 Browse & Import Backup File (.json)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

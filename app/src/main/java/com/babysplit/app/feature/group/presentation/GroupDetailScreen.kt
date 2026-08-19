@@ -143,6 +143,87 @@ fun GroupDetailScreen(
                     IconButton(onClick = { showAddMemberDialog = true }) {
                         Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member", tint = ChickAmber)
                     }
+                    IconButton(onClick = {
+                        try {
+                            val rootJson = org.json.JSONObject().apply {
+                                put("version", 2)
+                                put("originalGroupId", group.id)
+                                put("name", group.name)
+                                put("emoji", group.emoji)
+                                put("currency", group.currency)
+                                put("isFinished", group.isFinished)
+                                put("simplifyDebts", group.simplifyDebts)
+                                put("createdAtEpochMs", group.createdAtEpochMs)
+                                put("updatedAtEpochMs", System.currentTimeMillis())
+
+                                val membersArray = org.json.JSONArray()
+                                for (m in members) {
+                                    membersArray.put(org.json.JSONObject().apply {
+                                        put("oldId", m.id)
+                                        put("name", m.name)
+                                        put("memberType", m.memberType)
+                                        put("email", m.email ?: "")
+                                        put("phoneNumber", m.phoneNumber ?: "")
+                                        put("bankName", m.bankName ?: "")
+                                        put("accountHolderName", m.accountHolderName ?: "")
+                                        put("bankAccountNumber", m.bankAccountNumber ?: "")
+                                        put("eWalletName", m.eWalletName ?: "")
+                                        put("eWalletHandle", m.eWalletHandle ?: "")
+                                    })
+                                }
+                                put("members", membersArray)
+
+                                val expensesArray = org.json.JSONArray()
+                                for (exp in expenses) {
+                                    expensesArray.put(org.json.JSONObject().apply {
+                                        put("id", exp.id)
+                                        put("title", exp.title)
+                                        put("totalAmountCents", exp.totalAmountCents)
+                                        put("currency", exp.currency)
+                                        put("categoryName", exp.category.name)
+                                        put("paidByMemberId", exp.paidByMemberId)
+                                        put("paidByMemberName", exp.paidByMemberName)
+                                        put("splitType", exp.splitType.name)
+                                        put("receiptImagePath", exp.receiptImagePath ?: "")
+                                        put("note", exp.note ?: "")
+                                        put("createdAtEpochMs", exp.createdAtEpochMs)
+                                        put("isSettlement", exp.isSettlement)
+
+                                        val partsArray = org.json.JSONArray()
+                                        for (p in exp.participants) {
+                                            partsArray.put(org.json.JSONObject().apply {
+                                                put("memberId", p.memberId)
+                                                put("memberName", p.memberName)
+                                                put("amountCents", p.amountCents)
+                                                put("rawShareValue", p.rawShareValue)
+                                            })
+                                        }
+                                        put("participants", partsArray)
+                                    })
+                                }
+                                put("expenses", expensesArray)
+                            }
+
+                            val file = java.io.File(context.cacheDir, "trip_${group.name.replace("[^a-zA-Z0-9]".toRegex(), "_")}_backup.json")
+                            file.writeText(rootJson.toString(2))
+                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file
+                            )
+                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "application/json"
+                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Baby Split Backup: ${group.name}")
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Save or Share Trip Backup"))
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Export error: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }) {
+                        Icon(Icons.Filled.Share, contentDescription = "Export Backup", tint = ChickAmber)
+                    }
                     if (!group.isFinished) {
                         IconButton(onClick = { showFinishTripDialog = true }) {
                             Icon(Icons.Filled.CheckCircle, contentDescription = "Finish Trip", tint = SettledGreen)

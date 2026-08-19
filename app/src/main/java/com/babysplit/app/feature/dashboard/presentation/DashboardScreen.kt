@@ -33,8 +33,45 @@ fun DashboardScreen(
     onRestoreDiscoveredBackups: (List<com.babysplit.app.core.gdrive.DriveBackupItem>) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     var groupToDelete by remember { mutableStateOf<GroupEntity?>(null) }
     var discoveredBackups by remember { mutableStateOf<List<com.babysplit.app.core.gdrive.DriveBackupItem>>(emptyList()) }
+
+    val dashboardDocumentPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    val content = context.contentResolver.openInputStream(uri)?.use { stream ->
+                        stream.bufferedReader().readText()
+                    }
+                    if (!content.isNullOrBlank()) {
+                        val json = org.json.JSONObject(content)
+                        val name = json.optString("name", "Imported Trip")
+                        val emoji = json.optString("emoji", "✈️")
+                        val membersCount = json.optJSONArray("members")?.length() ?: 1
+                        val expensesCount = json.optJSONArray("expenses")?.length() ?: 0
+                        val timestamp = json.optLong("updatedAtEpochMs", json.optLong("createdAtEpochMs", System.currentTimeMillis()))
+
+                        val backupItem = com.babysplit.app.core.gdrive.DriveBackupItem(
+                            id = uri.toString(),
+                            tripName = name,
+                            emoji = emoji,
+                            timestampMs = timestamp,
+                            membersCount = membersCount,
+                            expensesCount = expensesCount,
+                            rawJson = content
+                        )
+                        onRestoreDiscoveredBackups(listOf(backupItem))
+                        android.widget.Toast.makeText(context, "Restored trip '$name' successfully! 🎉", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(context, "Failed to import backup: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     LaunchedEffect(groups.isEmpty()) {
         if (groups.isEmpty()) {
@@ -234,6 +271,17 @@ fun DashboardScreen(
                                     color = TextSecondary,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                OutlinedButton(
+                                    onClick = { dashboardDocumentPicker.launch(arrayOf("application/json", "*/*")) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, ChickGold),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ChickAmber)
+                                ) {
+                                    Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("📂 Import Backup File (.json)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
                     }
