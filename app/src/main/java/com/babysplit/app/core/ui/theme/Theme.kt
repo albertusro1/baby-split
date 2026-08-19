@@ -7,36 +7,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryBlue,
-    secondary = PurpleGrey80,
-    tertiary = Pink80,
-    background = SurfaceDark,
-    surface = CardBackgroundDark
+private val LightColorScheme = lightColorScheme(
+    primary = ChickAmber,
+    onPrimary = Color.White,
+    primaryContainer = ChickYellowLight,
+    onPrimaryContainer = Color(0xFF5E3900),
+    secondary = ChickGold,
+    onSecondary = Color(0xFF1C1B1F),
+    secondaryContainer = ChickYellowSubtle,
+    onSecondaryContainer = Color(0xFF4A3400),
+    tertiary = WhatsAppDarkGreen,
+    onTertiary = Color.White,
+    background = BackgroundLight,
+    onBackground = TextPrimary,
+    surface = SurfaceLight,
+    onSurface = TextPrimary,
+    surfaceVariant = SurfaceElevatedLight,
+    onSurfaceVariant = TextSecondary,
+    outline = SurfaceBorderLight,
+    error = DebtRed,
+    onError = Color.White,
+    errorContainer = DebtRedLight,
+    onErrorContainer = Color(0xFF8A0000)
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = PrimaryBlue,
-    secondary = PurpleGrey40,
-    tertiary = Pink40,
-    background = Color(0xFFF8FAFC),
-    surface = CardBackgroundLight
-)
+private val DarkColorScheme = LightColorScheme // Default to light theme for vibrant baby chick look
 
 @Composable
 fun BabySplitTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    darkTheme: Boolean = false, // Always vibrant Light Theme per user requirement
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

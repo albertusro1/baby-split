@@ -47,4 +47,44 @@ class BillSummaryFormatterTest {
         assertTrue(message.contains("123-456-789"))
         assertTrue(message.contains("BCA"))
     }
+
+    @Test
+    fun testFormatMemberWithAccountHolderName() {
+        val paymentDetails = HostPaymentDetails(
+            hostName = "Rowan",
+            bankName = "Mandiri",
+            accountHolderName = "Rowan Alexander",
+            bankAccountNumber = "987-654-321"
+        )
+
+        val expense = Expense(
+            groupId = 1L,
+            title = "Villa Booking",
+            totalAmountCents = 50000000L,
+            currency = "IDR",
+            category = ExpenseCategory.ACCOMMODATION,
+            paidByMemberId = 1L,
+            paidByMemberName = "Rowan",
+            splitType = SplitType.EQUAL,
+            participants = listOf(
+                ExpenseParticipant(2L, "Bob", 25000000L)
+            )
+        )
+
+        val message = BillSummaryFormatter.formatMemberWhatsAppMessage(
+            tripName = "Bali Trip",
+            memberName = "Bob",
+            memberExpenses = listOf(expense to 25000000L),
+            totalOwedCents = 25000000L,
+            currency = "IDR",
+            paymentDetails = paymentDetails
+        )
+
+        assertTrue(message.contains("Bali Trip"))
+        assertTrue(message.contains("Bob"))
+        assertTrue(message.contains("Mandiri"))
+        assertTrue(message.contains("987-654-321"))
+        assertTrue(message.contains("Rowan Alexander"))
+    }
 }
+

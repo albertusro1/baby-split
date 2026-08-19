@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.core.whatsapp
+package com.babysplit.app.core.whatsapp
 
 import com.babysplit.app.feature.balance.domain.engine.DebtSimplificationEngine
 import com.babysplit.app.feature.expense.domain.model.Expense
@@ -9,6 +9,7 @@ import java.util.Locale
 data class HostPaymentDetails(
     val hostName: String,
     val bankName: String? = null,
+    val accountHolderName: String? = null,
     val bankAccountNumber: String? = null,
     val eWalletName: String? = null,
     val eWalletHandle: String? = null,
@@ -81,7 +82,8 @@ object BillSummaryFormatter {
             sb.appendLine("💳 *Please transfer to:*")
             if (!paymentDetails.bankAccountNumber.isNullOrBlank()) {
                 val bank = paymentDetails.bankName ?: "Bank"
-                sb.appendLine("• *$bank*: ${paymentDetails.bankAccountNumber} (a.n. ${paymentDetails.hostName})")
+                val holder = if (!paymentDetails.accountHolderName.isNullOrBlank()) paymentDetails.accountHolderName else paymentDetails.hostName
+                sb.appendLine("• *$bank*: ${paymentDetails.bankAccountNumber} (a.n. $holder)")
             }
             if (!paymentDetails.eWalletHandle.isNullOrBlank()) {
                 val wallet = paymentDetails.eWalletName ?: "E-Wallet"
@@ -126,7 +128,8 @@ object BillSummaryFormatter {
         }.joinToString("\n")
 
         val bankInfo = if (paymentDetails != null && !paymentDetails.bankAccountNumber.isNullOrBlank()) {
-            "<p style='margin: 4px 0;'><strong>${paymentDetails.bankName ?: "Bank"}:</strong> ${paymentDetails.bankAccountNumber} (a.n. ${paymentDetails.hostName})</p>"
+            val holder = if (!paymentDetails.accountHolderName.isNullOrBlank()) paymentDetails.accountHolderName else paymentDetails.hostName
+            "<p style='margin: 4px 0;'><strong>${paymentDetails.bankName ?: "Bank"}:</strong> ${paymentDetails.bankAccountNumber} (a.n. $holder)</p>"
         } else ""
 
         val walletInfo = if (paymentDetails != null && !paymentDetails.eWalletHandle.isNullOrBlank()) {
@@ -153,8 +156,8 @@ object BillSummaryFormatter {
         <html>
         <head><meta charset="utf-8"/></head>
         <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #6200EE, #3700B3); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-                <h2 style="margin: 0;">Baby Split 👶</h2>
+            <div style="background: linear-gradient(135deg, #FFB800, #FF9100); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+                <h2 style="margin: 0;">Baby Split 🐥</h2>
                 <h3 style="margin: 5px 0 0 0; font-weight: normal;">$tripName</h3>
                 <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">$dateFormatted</p>
             </div>
@@ -179,7 +182,7 @@ object BillSummaryFormatter {
                 </div>
                 $paymentHtml
                 <p style="margin-top: 30px; font-size: 12px; color: #9E9E9E; text-align: center;">
-                    Generated automatically with Baby Split App 👶
+                    Generated automatically with Baby Split App 🐥
                 </p>
             </div>
         </body>
@@ -219,7 +222,8 @@ object BillSummaryFormatter {
             sb.appendLine("💳 *Host Payment Info:*")
             if (!paymentDetails.bankAccountNumber.isNullOrBlank()) {
                 val bank = paymentDetails.bankName ?: "Bank"
-                sb.appendLine("• $bank: ${paymentDetails.bankAccountNumber} (${paymentDetails.hostName})")
+                val holder = if (!paymentDetails.accountHolderName.isNullOrBlank()) paymentDetails.accountHolderName else paymentDetails.hostName
+                sb.appendLine("• $bank: ${paymentDetails.bankAccountNumber} (a.n. $holder)")
             }
             if (!paymentDetails.eWalletHandle.isNullOrBlank()) {
                 val wallet = paymentDetails.eWalletName ?: "E-Wallet"
@@ -228,7 +232,7 @@ object BillSummaryFormatter {
         }
 
         sb.appendLine()
-        sb.appendLine("Generated with Baby Split 👶")
+        sb.appendLine("Generated with Baby Split 🐥")
         return sb.toString().trim()
     }
 }

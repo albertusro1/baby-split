@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.feature.group.presentation
+package com.babysplit.app.feature.group.presentation
 
 import android.content.Context
 import androidx.compose.foundation.clickable
@@ -107,15 +107,16 @@ fun GroupDetailScreen(
     }
 
     Scaffold(
+        containerColor = BackgroundLight,
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("${group.emoji} ${group.name}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("${group.emoji} ${group.name}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
                         Text(
-                            text = "${members.size} Members • ${group.currency}${if (group.isFinished) " • Finished ✅" else ""}",
+                            text = "${members.size} Members • ${group.currency}${if (group.isFinished) " • Settled ✅" else ""}",
                             fontSize = 12.sp,
-                            color = if (group.isFinished) Color(0xFF388E3C) else MaterialTheme.colorScheme.primary
+                            color = if (group.isFinished) SettledGreen else ChickAmber
                         )
                     }
                 },
@@ -126,24 +127,27 @@ fun GroupDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = { showAddMemberDialog = true }) {
-                        Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member")
+                        Icon(Icons.Filled.PersonAdd, contentDescription = "Add Member", tint = ChickAmber)
                     }
                     if (!group.isFinished) {
                         IconButton(onClick = { showFinishTripDialog = true }) {
-                            Icon(Icons.Filled.CheckCircle, contentDescription = "Finish Trip", tint = Color(0xFF388E3C))
+                            Icon(Icons.Filled.CheckCircle, contentDescription = "Finish Trip", tint = SettledGreen)
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundLight)
             )
         },
         floatingActionButton = {
             if (selectedTab == 0 && !group.isFinished) {
                 ExtendedFloatingActionButton(
                     onClick = { onAddExpenseClick(group.id) },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text("Add Expense") },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White) },
+                    text = { Text("Add Expense", fontWeight = FontWeight.Bold, color = Color.White) },
+                    containerColor = ChickAmber,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
                 )
             }
         }
@@ -153,12 +157,22 @@ fun GroupDetailScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            TabRow(selectedTabIndex = selectedTab) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = SurfaceLight,
+                contentColor = ChickAmber
+            ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = (selectedTab == index),
                         onClick = { selectedTab = index },
-                        text = { Text(title) }
+                        text = {
+                            Text(
+                                title,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == index) ChickAmber else TextSecondary
+                            )
+                        }
                     )
                 }
             }
@@ -330,25 +344,30 @@ private fun BalancesTab(
     val context = LocalContext.current
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // 1. Group WhatsApp Share Header Action
         item {
-            // Group WhatsApp Share Header Action
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = WhatsAppLight),
+                border = BorderStroke(1.dp, WhatsAppGreen)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Group WhatsApp Summary", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("Share settlement instructions to group chat", fontSize = 12.sp, color = Color.DarkGray)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("📢 Share Entire Trip to WhatsApp Group", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF0F5132))
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Sends full spending total, simplified who-pays-whom settlement list, and host bank/e-wallet details to group chat.",
+                        fontSize = 12.sp,
+                        color = Color(0xFF146C43)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
                     Button(
                         onClick = {
                             val totalSpend = expenses.filter { !it.isSettlement }.sumOf { it.totalAmountCents }
@@ -361,11 +380,12 @@ private fun BalancesTab(
                             )
                             WhatsAppShareHelper.shareToWhatsApp(context, msg)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                        colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen, contentColor = Color.White),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(Icons.Filled.Share, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Share", color = Color.White)
+                        Icon(Icons.Filled.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Share Group Summary to WhatsApp 💬", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
@@ -377,11 +397,15 @@ private fun BalancesTab(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Individual Balances", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                FilledTonalButton(onClick = onSettleUpClick) {
-                    Icon(Icons.Filled.Payment, contentDescription = null)
+                Text("Individual Balances", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                Button(
+                    onClick = onSettleUpClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Filled.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Settle Up")
+                    Text("Settle Up", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -390,30 +414,34 @@ private fun BalancesTab(
             val member = members.firstOrNull { it.id == balance.memberId }
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                border = BorderStroke(1.dp, SurfaceBorderLight)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(balance.memberName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(balance.memberName, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
                         val statusText = when {
                             balance.netBalanceCents > 0 -> "Gets back ${BillSummaryFormatter.formatCents(balance.netBalanceCents, currency)}"
                             balance.netBalanceCents < 0 -> "Owes ${BillSummaryFormatter.formatCents(-balance.netBalanceCents, currency)}"
-                            else -> "Settled up ✅"
+                            else -> "All settled up ✅"
                         }
                         val statusColor = when {
-                            balance.netBalanceCents > 0 -> Color(0xFF388E3C)
-                            balance.netBalanceCents < 0 -> Color(0xFFD32F2F)
-                            else -> Color.Gray
+                            balance.netBalanceCents > 0 -> SettledGreen
+                            balance.netBalanceCents < 0 -> DebtRed
+                            else -> TextSecondary
                         }
                         Text(statusText, fontSize = 13.sp, color = statusColor, fontWeight = FontWeight.SemiBold)
                     }
 
-                    // 1-Tap Member WhatsApp Breakdown Share
-                    IconButton(
+                    // Explicit Labeled Member WhatsApp Breakdown Share
+                    OutlinedButton(
                         onClick = {
                             val memberExpenses = mutableListOf<Pair<Expense, Long>>()
                             for (exp in expenses) {
@@ -429,39 +457,48 @@ private fun BalancesTab(
                                 paymentDetails = paymentDetails
                             )
                             WhatsAppShareHelper.shareToWhatsApp(context, msg, member?.phoneNumber)
-                        }
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = WhatsAppDarkGreen),
+                        border = BorderStroke(1.dp, WhatsAppGreen),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send Breakdown", tint = Color(0xFF25D366))
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = WhatsAppDarkGreen, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Send WA Bill", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
         item {
-            Text("Simplified Repayments (${simplifiedTransactions.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("Simplified Repayments (${simplifiedTransactions.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
         }
 
         if (simplifiedTransactions.isEmpty()) {
             item {
-                Text("No outstanding debts 🎉", color = Color.Gray, fontSize = 14.sp)
+                Text("No outstanding debts 🎉", color = TextSecondary, fontSize = 14.sp)
             }
         } else {
             items(simplifiedTransactions) { tx ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceElevatedLight),
+                    border = BorderStroke(1.dp, SurfaceBorderLight)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("${tx.debtorName} ➔ ${tx.creditorName}", fontWeight = FontWeight.Medium)
+                        Text("${tx.debtorName} ➔ ${tx.creditorName}", fontWeight = FontWeight.Medium, color = TextPrimary)
                         Text(
                             BillSummaryFormatter.formatCents(tx.amountCents, currency),
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = ChickAmber
                         )
                     }
                 }

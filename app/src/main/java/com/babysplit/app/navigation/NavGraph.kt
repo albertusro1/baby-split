@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.navigation
+package com.babysplit.app.navigation
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +46,8 @@ fun NavGraph(
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 groups = groups,
+                userEmail = userEmail,
+                userName = userName,
                 onGroupClick = { groupId ->
                     navController.navigate(Screen.GroupDetail.createRoute(groupId))
                 },
@@ -205,18 +207,35 @@ fun NavGraph(
         }
 
         composable(Screen.Profile.route) {
+            val context = androidx.compose.ui.platform.LocalContext.current
             ProfileScreen(
                 currentPaymentDetails = paymentDetails,
                 currentCurrency = defaultCurrency,
                 userEmail = userEmail,
+                userName = userName,
                 onBackClick = { navController.popBackStack() },
-                onSavePaymentDetails = { bank, account, wallet, handle, note, curr ->
+                onSavePaymentDetails = { bank, holder, account, wallet, handle, note, curr ->
                     scope.launch {
-                        userPrefs.savePaymentDetails(bank, account, wallet, handle, note, curr)
+                        userPrefs.savePaymentDetails(bank, holder, account, wallet, handle, note, curr)
                     }
                 },
                 onGoogleSignInClick = {
-                    // Google Sign-In trigger
+                    scope.launch {
+                        com.babysplit.app.core.auth.GoogleAuthManager.signInWithGoogle(
+                            context = context,
+                            onSuccess = { name, email ->
+                                scope.launch {
+                                    userPrefs.saveUserProfile(name, email)
+                                }
+                            },
+                            onError = { _ -> }
+                        )
+                    }
+                },
+                onSignOutClick = {
+                    scope.launch {
+                        userPrefs.signOut()
+                    }
                 }
             )
         }

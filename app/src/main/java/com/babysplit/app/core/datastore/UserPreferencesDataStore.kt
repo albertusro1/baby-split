@@ -1,4 +1,4 @@
-﻿package com.babysplit.app.core.datastore
+package com.babysplit.app.core.datastore
 
 import android.content.Context
 import androidx.datastore.preferences.core.*
@@ -17,6 +17,7 @@ class UserPreferencesDataStore(private val context: Context) {
         val USER_AVATAR = stringPreferencesKey("user_avatar")
         val DEFAULT_CURRENCY = stringPreferencesKey("default_currency")
         val BANK_NAME = stringPreferencesKey("bank_name")
+        val BANK_ACCOUNT_HOLDER = stringPreferencesKey("bank_account_holder")
         val BANK_ACCOUNT = stringPreferencesKey("bank_account")
         val EWALLET_NAME = stringPreferencesKey("ewallet_name")
         val EWALLET_HANDLE = stringPreferencesKey("ewallet_handle")
@@ -28,6 +29,7 @@ class UserPreferencesDataStore(private val context: Context) {
         HostPaymentDetails(
             hostName = prefs[USER_NAME] ?: "Host",
             bankName = prefs[BANK_NAME],
+            accountHolderName = prefs[BANK_ACCOUNT_HOLDER],
             bankAccountNumber = prefs[BANK_ACCOUNT],
             eWalletName = prefs[EWALLET_NAME],
             eWalletHandle = prefs[EWALLET_HANDLE],
@@ -40,7 +42,7 @@ class UserPreferencesDataStore(private val context: Context) {
     }
 
     val userNameFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[USER_NAME] ?: "Host"
+        prefs[USER_NAME] ?: "Guest"
     }
 
     val userEmailFlow: Flow<String?> = context.dataStore.data.map { prefs ->
@@ -50,13 +52,22 @@ class UserPreferencesDataStore(private val context: Context) {
     suspend fun saveUserProfile(name: String, email: String?, avatarUrl: String? = null) {
         context.dataStore.edit { prefs ->
             prefs[USER_NAME] = name
-            if (email != null) prefs[USER_EMAIL] = email
-            if (avatarUrl != null) prefs[USER_AVATAR] = avatarUrl
+            if (email != null) prefs[USER_EMAIL] = email else prefs.remove(USER_EMAIL)
+            if (avatarUrl != null) prefs[USER_AVATAR] = avatarUrl else prefs.remove(USER_AVATAR)
+        }
+    }
+
+    suspend fun signOut() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(USER_EMAIL)
+            prefs.remove(USER_AVATAR)
+            prefs[USER_NAME] = "Guest"
         }
     }
 
     suspend fun savePaymentDetails(
         bankName: String?,
+        bankAccountHolder: String?,
         bankAccount: String?,
         eWalletName: String?,
         eWalletHandle: String?,
@@ -64,11 +75,12 @@ class UserPreferencesDataStore(private val context: Context) {
         defaultCurrency: String
     ) {
         context.dataStore.edit { prefs ->
-            if (bankName != null) prefs[BANK_NAME] = bankName else prefs.remove(BANK_NAME)
-            if (bankAccount != null) prefs[BANK_ACCOUNT] = bankAccount else prefs.remove(BANK_ACCOUNT)
-            if (eWalletName != null) prefs[EWALLET_NAME] = eWalletName else prefs.remove(EWALLET_NAME)
-            if (eWalletHandle != null) prefs[EWALLET_HANDLE] = eWalletHandle else prefs.remove(EWALLET_HANDLE)
-            if (paymentNote != null) prefs[PAYMENT_NOTE] = paymentNote else prefs.remove(PAYMENT_NOTE)
+            if (!bankName.isNullOrBlank()) prefs[BANK_NAME] = bankName else prefs.remove(BANK_NAME)
+            if (!bankAccountHolder.isNullOrBlank()) prefs[BANK_ACCOUNT_HOLDER] = bankAccountHolder else prefs.remove(BANK_ACCOUNT_HOLDER)
+            if (!bankAccount.isNullOrBlank()) prefs[BANK_ACCOUNT] = bankAccount else prefs.remove(BANK_ACCOUNT)
+            if (!eWalletName.isNullOrBlank()) prefs[EWALLET_NAME] = eWalletName else prefs.remove(EWALLET_NAME)
+            if (!eWalletHandle.isNullOrBlank()) prefs[EWALLET_HANDLE] = eWalletHandle else prefs.remove(EWALLET_HANDLE)
+            if (!paymentNote.isNullOrBlank()) prefs[PAYMENT_NOTE] = paymentNote else prefs.remove(PAYMENT_NOTE)
             prefs[DEFAULT_CURRENCY] = defaultCurrency
         }
     }
