@@ -29,7 +29,7 @@ fun ProfileScreen(
     userName: String = "Guest",
     onBackClick: () -> Unit,
     onSavePaymentDetails: (bank: String?, holder: String?, account: String?, wallet: String?, handle: String?, note: String?, currency: String) -> Unit,
-    onGoogleSignInClick: () -> Unit,
+    onSaveUserProfile: (name: String, email: String) -> Unit,
     onSignOutClick: () -> Unit
 ) {
     var bankName by remember(currentPaymentDetails) { mutableStateOf(currentPaymentDetails?.bankName ?: "") }
@@ -42,6 +42,11 @@ fun ProfileScreen(
 
     val popularCurrencies = listOf("IDR", "USD", "EUR", "SGD", "GBP", "JPY", "AUD")
     val popularWallets = listOf("GoPay", "OVO", "Dana", "ShopeePay", "PayPal")
+
+    var showGoogleAuthDialog by remember { mutableStateOf(false) }
+    var inputGoogleEmail by remember { mutableStateOf("") }
+    var inputGoogleName by remember { mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(
         containerColor = BackgroundLight,
@@ -95,13 +100,13 @@ fun ProfileScreen(
                             }
                         } else {
                             Text(
-                                text = "You are currently using Baby Split offline as Guest. Link your Google account so your trip history and receipts are safely backed up to Google Drive and receipts are emailed automatically.",
+                                text = "You are currently using Baby Split offline as Guest. Link your Google account so your trip history and receipts are safely backed up to your Google Drive folder.",
                                 fontSize = 12.sp,
                                 color = TextSecondary
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
-                                onClick = onGoogleSignInClick,
+                                onClick = { showGoogleAuthDialog = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
@@ -261,6 +266,88 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(40.dp))
             }
         }
+    }
+
+    if (showGoogleAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showGoogleAuthDialog = false },
+            containerColor = SurfaceLight,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("☁️ Google Account Sign-In", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Sign in to automatically sync your trip expenses and receipt archives to your personal Google Drive folder.",
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            val intent = android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse("https://accounts.google.com/")
+                            )
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Filled.OpenInBrowser, contentDescription = null, tint = ChickAmber)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Open Google in Browser 🌐", fontSize = 13.sp, color = TextPrimary)
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = SurfaceBorderLight)
+
+                    Text("Enter your Google Account email to link:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+                    OutlinedTextField(
+                        value = inputGoogleEmail,
+                        onValueChange = { inputGoogleEmail = it },
+                        label = { Text("Google Email") },
+                        placeholder = { Text("yourname@gmail.com") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = inputGoogleName,
+                        onValueChange = { inputGoogleName = it },
+                        label = { Text("Display Name (Optional)") },
+                        placeholder = { Text("e.g. Rowan") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (inputGoogleEmail.isNotBlank()) {
+                            val name = inputGoogleName.ifBlank { inputGoogleEmail.substringBefore("@").replaceFirstChar { it.uppercase() } }
+                            onSaveUserProfile(name, inputGoogleEmail.trim())
+                            showGoogleAuthDialog = false
+                        }
+                    },
+                    enabled = inputGoogleEmail.isNotBlank() && inputGoogleEmail.contains("@"),
+                    colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Link Account ☁️", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGoogleAuthDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
     }
 }
 

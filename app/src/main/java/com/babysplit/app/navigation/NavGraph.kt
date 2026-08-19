@@ -208,7 +208,6 @@ fun NavGraph(
         }
 
         composable(Screen.Profile.route) {
-            val context = androidx.compose.ui.platform.LocalContext.current
             ProfileScreen(
                 currentPaymentDetails = paymentDetails,
                 currentCurrency = defaultCurrency,
@@ -220,17 +219,9 @@ fun NavGraph(
                         userPrefs.savePaymentDetails(bank, holder, account, wallet, handle, note, curr)
                     }
                 },
-                onGoogleSignInClick = {
+                onSaveUserProfile = { name, email ->
                     scope.launch {
-                        com.babysplit.app.core.auth.GoogleAuthManager.signInWithGoogle(
-                            context = context,
-                            onSuccess = { name, email ->
-                                scope.launch {
-                                    userPrefs.saveUserProfile(name, email)
-                                }
-                            },
-                            onError = { _ -> }
-                        )
+                        userPrefs.saveUserProfile(name, email)
                     }
                 },
                 onSignOutClick = {

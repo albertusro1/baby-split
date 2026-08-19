@@ -240,12 +240,15 @@ fun GroupDetailScreen(
     if (showFinishTripDialog) {
         AlertDialog(
             onDismissRequest = { showFinishTripDialog = false },
-            title = { Text("🏁 Finish Trip & Send Receipts") },
+            containerColor = SurfaceLight,
+            shape = RoundedCornerShape(20.dp),
+            title = { Text("🏁 Finish & Settle Trip", fontWeight = FontWeight.Bold, color = TextPrimary) },
             text = {
                 Text(
-                    "This will finalize all balances for '${group.name}'.\n\n" +
-                    "• Automated receipts will be emailed to all Gmail-invited members.\n" +
-                    "• Trip history and receipts will be backed up to Google Drive."
+                    "This will finalize all expenses and balances for '${group.name}'.\n\n" +
+                    "• Trip records and receipts will be safely archived to Google Drive (if connected).\n" +
+                    "• You can still view full expense histories, receipts, and share WhatsApp summaries anytime.",
+                    color = TextSecondary
                 )
             },
             confirmButton = {
@@ -254,14 +257,15 @@ fun GroupDetailScreen(
                         onFinishTrip()
                         showFinishTripDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
+                    colors = ButtonDefaults.buttonColors(containerColor = SettledGreen, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Finish Trip")
+                    Text("Finish Trip ✅", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showFinishTripDialog = false }) {
-                    Text("Cancel")
+                    Text("Cancel", color = TextSecondary)
                 }
             }
         )

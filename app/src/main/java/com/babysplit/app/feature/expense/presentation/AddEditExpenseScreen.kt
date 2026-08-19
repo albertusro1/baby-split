@@ -198,6 +198,7 @@ fun AddEditExpenseScreen(
         containerColor = BackgroundLight,
         modifier = Modifier
             .fillMaxSize()
+            .navigationBarsPadding()
             .imePadding(),
         topBar = {
             TopAppBar(
@@ -213,7 +214,7 @@ fun AddEditExpenseScreen(
         bottomBar = {
             Surface(
                 color = SurfaceLight,
-                shadowElevation = 12.dp,
+                shadowElevation = 16.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -371,31 +372,32 @@ fun AddEditExpenseScreen(
                 }
             }
 
-            // 5. Split Method Selector
+            // 5. Split Method Selector - Clean, spacious, scrollable
             item {
                 Text("Split Method", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    listOf(
-                        SplitType.EQUAL to "=",
-                        SplitType.PERCENTAGE to "%",
-                        SplitType.EXACT to "$",
-                        SplitType.SHARE to "Shares",
-                        SplitType.ADJUSTMENT to "+/-"
-                    ).forEach { (st, label) ->
+                    val splitMethods = listOf(
+                        SplitType.EQUAL to "= Equal",
+                        SplitType.PERCENTAGE to "% Percent",
+                        SplitType.EXACT to "$ Exact",
+                        SplitType.SHARE to "➗ Shares",
+                        SplitType.ADJUSTMENT to "± Adjust"
+                    )
+                    items(splitMethods) { (st, label) ->
                         FilterChip(
                             selected = (splitType == st),
                             onClick = { onSplitTypeChanged(st) },
                             label = { Text(label, fontWeight = FontWeight.Bold, fontSize = 13.sp) },
-                            modifier = Modifier.weight(1f)
+                            shape = RoundedCornerShape(10.dp)
                         )
                     }
                 }
             }
 
-            // 6. Split Breakdown Card with Real-time Calculations
+            // 6. Split Breakdown Card with Locked Column Alignments
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -428,16 +430,18 @@ fun AddEditExpenseScreen(
                             )
                         }
 
-                        // Member rows
+                        // Member rows with locked column widths so inputs never shift position
                         members.forEach { member ->
                             val participant = calculatedParticipants.firstOrNull { it.memberId == member.id }
                             val allocatedCents = participant?.amountCents ?: 0L
 
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                // 1. Member Name (expands to take available space)
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
@@ -454,10 +458,12 @@ fun AddEditExpenseScreen(
                                         text = member.name,
                                         fontWeight = FontWeight.Medium,
                                         fontSize = 14.sp,
+                                        maxLines = 1,
                                         color = if (equalSelectionMap[member.id] == false && splitType == SplitType.EQUAL) TextTertiary else TextPrimary
                                     )
                                 }
 
+                                // 2. Input Box (Fixed width and position for every member)
                                 if (splitType != SplitType.EQUAL) {
                                     OutlinedTextField(
                                         value = memberInputs[member.id] ?: "",
@@ -473,19 +479,21 @@ fun AddEditExpenseScreen(
                                             }
                                         },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        modifier = Modifier
-                                            .width(90.dp)
-                                            .padding(end = 10.dp),
+                                        modifier = Modifier.width(95.dp),
                                         singleLine = true,
                                         shape = RoundedCornerShape(8.dp),
                                         textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, textAlign = TextAlign.End)
                                     )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
 
+                                // 3. Formatted Total (Fixed width and end-aligned)
                                 Text(
                                     text = BillSummaryFormatter.formatCents(allocatedCents, currency),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.width(95.dp),
                                     color = if (allocatedCents > 0) ChickAmber else TextTertiary
                                 )
                             }
