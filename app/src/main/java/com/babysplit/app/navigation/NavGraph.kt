@@ -234,6 +234,13 @@ fun NavGraph(
                         userPrefs.saveUserProfile(name, email)
                     }
                 },
+                onRestoreBackups = { backups ->
+                    scope.launch {
+                        for (backup in backups) {
+                            com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(database, backup)
+                        }
+                    }
+                },
                 onSignOutClick = {
                     scope.launch {
                         userPrefs.signOut()
