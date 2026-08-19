@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.babysplit.app.core.whatsapp.HostPaymentDetails
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 
 val Context.dataStore by preferencesDataStore(name = "user_preferences")
@@ -50,7 +51,7 @@ class UserPreferencesDataStore(private val context: Context) {
     }
 
     suspend fun getUserEmailDirect(): String? {
-        return kotlinx.coroutines.flow.firstOrNull(context.dataStore.data)?.get(USER_EMAIL)
+        return context.dataStore.data.firstOrNull()?.get(USER_EMAIL)
     }
 
     suspend fun saveUserProfile(name: String, email: String?, avatarUrl: String? = null) {
