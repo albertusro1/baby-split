@@ -158,21 +158,7 @@ object GoogleDriveBackupEngine {
             val jsonContent = rootJson.toString(2)
             val fileName = "trip_${group.name.replace("[^a-zA-Z0-9]".toRegex(), "_")}_backup.json"
 
-            // 1. Upload to Real Google Drive Cloud (if user linked Google Account)
-            try {
-                val userPrefs = com.babysplit.app.core.datastore.UserPreferencesDataStore(context)
-                val userEmail = userPrefs.getUserEmailDirect()
-                if (!userEmail.isNullOrBlank()) {
-                    val token = GoogleDriveCloudClient.getAccessToken(context, userEmail)
-                    if (!token.isNullOrBlank()) {
-                        GoogleDriveCloudClient.uploadOrUpdateBackup(token, fileName, jsonContent)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            // 2. Save via Android MediaStore (survives app uninstallation on Android 10-15+)
+            // 1. Save via Android MediaStore (survives app uninstallation on Android 10-15+)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 try {
                     val resolver = context.contentResolver
