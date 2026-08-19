@@ -77,7 +77,7 @@ object GoogleDriveBackupEngine {
 
     /**
      * Automatically captures a full lossless snapshot of a trip (group, members, expenses, participants)
-     * and saves it to all persistent storage locations.
+     * and saves it to all persistent storage locations including Android MediaStore.
      */
     suspend fun autoExportTripSnapshot(
         context: Context,
@@ -157,6 +157,30 @@ object GoogleDriveBackupEngine {
             val jsonContent = rootJson.toString(2)
             val fileName = "trip_${group.name.replace("[^a-zA-Z0-9]".toRegex(), "_")}_backup.json"
 
+            // 1. Save via Android MediaStore (survives app uninstallation on Android 10-15+)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                try {
+                    val resolver = context.contentResolver
+                    val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                    val contentValues = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "${android.os.Environment.DIRECTORY_DOWNLOADS}/BabySplit_Backups")
+                    }
+
+                    val uri = resolver.insert(collection, contentValues)
+                    if (uri != null) {
+                        resolver.openOutputStream(uri, "wt")?.use { stream ->
+                            stream.write(jsonContent.toByteArray(Charsets.UTF_8))
+                            stream.flush()
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            // 2. Save to persistent file directories
             val targetDirs = getPersistentBackupDirs(context)
             for (dir in targetDirs) {
                 try {
@@ -175,10 +199,72 @@ object GoogleDriveBackupEngine {
     }
 
     /**
-     * Searches all persistent storage directories on the device for Baby Split trip backups.
+     * Searches all persistent storage directories and MediaStore on the device for Baby Split trip backups.
      */
     suspend fun searchForDriveBackups(context: Context, email: String): List<DriveBackupItem> = withContext(Dispatchers.IO) {
         val backupsMap = mutableMapOf<String, DriveBackupItem>()
+        val resolver = context.contentResolver
+
+        // 1. Search via MediaStore (reads files created by previous app installs)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            try {
+                val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val projection = arrayOf(
+                    android.provider.MediaStore.MediaColumns._ID,
+                    android.provider.MediaStore.MediaColumns.DISPLAY_NAME,
+                    android.provider.MediaStore.MediaColumns.DATE_MODIFIED
+                )
+                val selection = "${android.provider.MediaStore.MediaColumns.DISPLAY_NAME} LIKE 'trip_%_backup.json'"
+
+                resolver.query(collection, projection, selection, null, null)?.use { cursor ->
+                    val idCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.MediaColumns._ID)
+                    val nameCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.MediaColumns.DISPLAY_NAME)
+                    val dateCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.MediaColumns.DATE_MODIFIED)
+
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idCol)
+                        val fileName = cursor.getString(nameCol) ?: "backup.json"
+                        val modTimeSeconds = cursor.getLong(dateCol)
+                        val uri = android.content.ContentUris.withAppendedId(collection, id)
+
+                        try {
+                            resolver.openInputStream(uri)?.use { stream ->
+                                val content = stream.bufferedReader().readText()
+                                if (content.isNotBlank()) {
+                                    val json = JSONObject(content)
+                                    val name = json.optString("name", fileName.removePrefix("trip_").removeSuffix("_backup.json").replace("_", " "))
+                                    val emoji = json.optString("emoji", "✈️")
+                                    val membersArray = json.optJSONArray("members")
+                                    val membersCount = membersArray?.length() ?: json.optInt("membersCount", 1)
+                                    val expensesArray = json.optJSONArray("expenses")
+                                    val expensesCount = expensesArray?.length() ?: json.optInt("expensesCount", 0)
+                                    val timestamp = json.optLong("updatedAtEpochMs", json.optLong("createdAtEpochMs", modTimeSeconds * 1000))
+
+                                    val key = "${name.trim().lowercase()}_$emoji"
+                                    if (!backupsMap.containsKey(key) || (backupsMap[key]?.timestampMs ?: 0L) < timestamp) {
+                                        backupsMap[key] = DriveBackupItem(
+                                            id = fileName,
+                                            tripName = name,
+                                            emoji = emoji,
+                                            timestampMs = timestamp,
+                                            membersCount = membersCount,
+                                            expensesCount = expensesCount,
+                                            rawJson = content
+                                        )
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 2. Search persistent filesystem directories
         try {
             val targetDirs = getPersistentBackupDirs(context)
 
@@ -189,27 +275,28 @@ object GoogleDriveBackupEngine {
                 for (file in files) {
                     try {
                         val content = file.readText()
-                        val json = JSONObject(content)
-                        val name = json.optString("name", file.nameWithoutExtension.removePrefix("trip_").removeSuffix("_backup").replace("_", " "))
-                        val emoji = json.optString("emoji", "✈️")
-                        val membersArray = json.optJSONArray("members")
-                        val membersCount = membersArray?.length() ?: json.optInt("membersCount", 1)
-                        val expensesArray = json.optJSONArray("expenses")
-                        val expensesCount = expensesArray?.length() ?: json.optInt("expensesCount", 0)
-                        val timestamp = json.optLong("updatedAtEpochMs", json.optLong("createdAtEpochMs", file.lastModified()))
+                        if (content.isNotBlank()) {
+                            val json = JSONObject(content)
+                            val name = json.optString("name", file.nameWithoutExtension.removePrefix("trip_").removeSuffix("_backup").replace("_", " "))
+                            val emoji = json.optString("emoji", "✈️")
+                            val membersArray = json.optJSONArray("members")
+                            val membersCount = membersArray?.length() ?: json.optInt("membersCount", 1)
+                            val expensesArray = json.optJSONArray("expenses")
+                            val expensesCount = expensesArray?.length() ?: json.optInt("expensesCount", 0)
+                            val timestamp = json.optLong("updatedAtEpochMs", json.optLong("createdAtEpochMs", file.lastModified()))
 
-                        val key = "${name.trim().lowercase()}_$emoji"
-                        // Keep newest backup if duplicate
-                        if (!backupsMap.containsKey(key) || (backupsMap[key]?.timestampMs ?: 0L) < timestamp) {
-                            backupsMap[key] = DriveBackupItem(
-                                id = file.name,
-                                tripName = name,
-                                emoji = emoji,
-                                timestampMs = timestamp,
-                                membersCount = membersCount,
-                                expensesCount = expensesCount,
-                                rawJson = content
-                            )
+                            val key = "${name.trim().lowercase()}_$emoji"
+                            if (!backupsMap.containsKey(key) || (backupsMap[key]?.timestampMs ?: 0L) < timestamp) {
+                                backupsMap[key] = DriveBackupItem(
+                                    id = file.name,
+                                    tripName = name,
+                                    emoji = emoji,
+                                    timestampMs = timestamp,
+                                    membersCount = membersCount,
+                                    expensesCount = expensesCount,
+                                    rawJson = content
+                                )
+                            }
                         }
                     } catch (e: Exception) {
                         // Skip unparseable individual backup
