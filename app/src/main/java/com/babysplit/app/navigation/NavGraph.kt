@@ -48,8 +48,6 @@ fun NavGraph(
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 groups = groups,
-                userEmail = userEmail,
-                userName = userName,
                 onGroupClick = { groupId ->
                     navController.navigate(Screen.GroupDetail.createRoute(groupId))
                 },
@@ -275,8 +273,6 @@ fun NavGraph(
             ProfileScreen(
                 currentPaymentDetails = paymentDetails,
                 currentCurrency = defaultCurrency,
-                userEmail = userEmail,
-                userName = userName,
                 onBackClick = { navController.popBackStack() },
                 onSavePaymentDetails = { bank, holder, account, wallet, handle, note, curr ->
                     scope.launch {
@@ -299,12 +295,6 @@ fun NavGraph(
                             }
                             com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.autoExportTripSnapshot(context, database, g.id)
                         }
-                        com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.exportProfileToCloud(context, userPrefs)
-                    }
-                },
-                onSaveUserProfile = { name, email ->
-                    scope.launch {
-                        userPrefs.saveUserProfile(name, email)
                     }
                 },
                 onRestoreBackups = { backups ->
@@ -312,11 +302,6 @@ fun NavGraph(
                         for (backup in backups) {
                             com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.restoreTripBackup(database, backup)
                         }
-                    }
-                },
-                onSignOutClick = {
-                    scope.launch {
-                        userPrefs.signOut()
                     }
                 }
             )

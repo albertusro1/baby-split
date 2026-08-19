@@ -26,13 +26,9 @@ import kotlinx.coroutines.launch
 fun ProfileScreen(
     currentPaymentDetails: HostPaymentDetails?,
     currentCurrency: String,
-    userEmail: String?,
-    userName: String = "Guest",
     onBackClick: () -> Unit,
     onSavePaymentDetails: (bank: String?, holder: String?, account: String?, wallet: String?, handle: String?, note: String?, currency: String) -> Unit,
-    onSaveUserProfile: (name: String, email: String) -> Unit,
-    onRestoreBackups: (List<com.babysplit.app.core.gdrive.DriveBackupItem>) -> Unit = {},
-    onSignOutClick: () -> Unit
+    onRestoreBackups: (List<com.babysplit.app.core.gdrive.DriveBackupItem>) -> Unit = {}
 ) {
     var bankName by remember(currentPaymentDetails) { mutableStateOf(currentPaymentDetails?.bankName ?: "") }
     var accountHolderName by remember(currentPaymentDetails) { mutableStateOf(currentPaymentDetails?.accountHolderName ?: "") }
@@ -45,35 +41,10 @@ fun ProfileScreen(
     val popularCurrencies = listOf("IDR", "USD", "EUR", "SGD", "GBP", "JPY", "AUD")
     val popularWallets = listOf("GoPay", "OVO", "Dana", "ShopeePay", "PayPal")
 
-    var isScanningDrive by remember { mutableStateOf(false) }
     var discoveredBackups by remember { mutableStateOf<List<com.babysplit.app.core.gdrive.DriveBackupItem>>(emptyList()) }
     var showRestorePromptDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
-
-    val accountPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
-            val selectedEmail = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
-            if (!selectedEmail.isNullOrBlank()) {
-                val derivedName = selectedEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
-                onSaveUserProfile(derivedName, selectedEmail)
-
-                isScanningDrive = true
-                scope.launch {
-                    val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, selectedEmail)
-                    isScanningDrive = false
-                    if (backups.isNotEmpty()) {
-                        discoveredBackups = backups
-                        showRestorePromptDialog = true
-                    } else {
-                        android.widget.Toast.makeText(context, "Google account linked: $selectedEmail", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-    }
 
     val documentPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
@@ -134,105 +105,33 @@ fun ProfileScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. Google Account & Cloud Backup Card
+            // 1. 💾 Offline Data Backup & Restore Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = if (userEmail != null) SettledGreenLight else ChickYellowLight),
-                    border = BorderStroke(1.dp, if (userEmail != null) Color(0xFFC8E6C9) else ChickGold)
+                    colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                    border = BorderStroke(1.dp, SurfaceBorderLight)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (userEmail != null) "☁️ Google Account Linked" else "👤 Guest Mode (Local Storage)",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = if (userEmail != null) SettledGreen else TextPrimary
-                            )
+                            Text("💾 Backup & Restore Archives", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        if (userEmail != null) {
-                            Text("Signed in as: $userEmail", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            Text("Your trip records, summaries & receipts are automatically archived to Google Drive.", fontSize = 12.sp, color = TextSecondary)
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        if (!isScanningDrive) {
-                                            isScanningDrive = true
-                                            scope.launch {
-                                                val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, userEmail)
-                                                isScanningDrive = false
-                                                if (backups.isNotEmpty()) {
-                                                    discoveredBackups = backups
-                                                    showRestorePromptDialog = true
-                                                } else {
-                                                    android.widget.Toast.makeText(context, "No backup files found on device or Google Drive.", android.widget.Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = SettledGreen, contentColor = Color.White),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    if (isScanningDrive) {
-                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                                    } else {
-                                        Text("🔍 Restore Backups", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                OutlinedButton(
-                                    onClick = onSignOutClick,
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DebtRed),
-                                    border = BorderStroke(1.dp, DebtRed),
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Text("Sign Out", fontSize = 12.sp)
-                                }
-                            }
-                        } else {
-                            Text(
-                                text = "You are currently using Baby Split offline as Guest. Link your Google account so your trip history and receipts are safely backed up to your Google Drive folder.",
-                                fontSize = 12.sp,
-                                color = TextSecondary
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = {
-                                    val pickerIntent = com.babysplit.app.core.auth.GoogleAuthManager.createGoogleAccountPickerIntent()
-                                    accountPickerLauncher.launch(pickerIntent)
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                if (isScanningDrive) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Searching Backups...", fontWeight = FontWeight.Bold)
-                                } else {
-                                    Icon(Icons.Filled.AccountCircle, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("🔗 Sign In with Google", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        // Manual File Picker Option
+                        Text(
+                            "Baby Split keeps your trip records 100% private and stored locally on your device. You can import or export trip archives (.json) at any time.",
+                            fontSize = 12.sp,
+                            color = TextSecondary
+                        )
                         OutlinedButton(
                             onClick = { documentPickerLauncher.launch(arrayOf("application/json", "*/*")) },
-                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
                             border = BorderStroke(1.dp, ChickGold),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = ChickAmber)
                         ) {
-                            Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("📂 Browse & Import Backup File (.json)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("📂 Browse & Import Backup File (.json)", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -250,7 +149,7 @@ fun ProfileScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("🏦 Bank Transfer Details", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         }
-                        Text("This info will be embedded in WhatsApp & Gmail bills for friends to transfer to.", fontSize = 12.sp, color = TextSecondary)
+                        Text("This info will be embedded in WhatsApp bills for friends to transfer to.", fontSize = 12.sp, color = TextSecondary)
 
                         OutlinedTextField(
                             value = bankName,
@@ -423,7 +322,7 @@ fun ProfileScreen(
         }
     }
 
-    // Found Existing Google Drive Backups Dialog
+    // Found Existing Backups Dialog
     if (showRestorePromptDialog) {
         AlertDialog(
             onDismissRequest = { /* Keep dialog visible until explicit user action */ },
@@ -434,12 +333,12 @@ fun ProfileScreen(
             containerColor = SurfaceLight,
             shape = RoundedCornerShape(20.dp),
             title = {
-                Text("☁️ Backups Found on Google Drive!", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+                Text("📥 Import Backup File", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "We discovered previous Baby Split trip backup(s) on your device / Google Drive:",
+                        "Found valid Baby Split trip archive:",
                         fontSize = 13.sp,
                         color = TextSecondary
                     )
@@ -463,7 +362,7 @@ fun ProfileScreen(
                             }
                         }
                     }
-                    Text("Would you like to import and restore these trips into your app?", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                    Text("Would you like to restore this trip into your app?", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                 }
             },
             confirmButton = {
@@ -476,14 +375,15 @@ fun ProfileScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = SettledGreen, contentColor = Color.White),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Restore Trips 📥", fontWeight = FontWeight.Bold)
+                    Text("Restore Trip 📥", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRestorePromptDialog = false }) {
-                    Text("Skip / Start Fresh", color = TextSecondary)
+                    Text("Cancel", color = TextSecondary)
                 }
             }
         )
     }
 }
+

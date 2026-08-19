@@ -25,8 +25,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun DashboardScreen(
     groups: List<GroupEntity>,
-    userEmail: String? = null,
-    userName: String = "Guest",
     onGroupClick: (Long) -> Unit,
     onCreateGroupClick: () -> Unit,
     onProfileClick: () -> Unit,
@@ -36,7 +34,6 @@ fun DashboardScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var groupToDelete by remember { mutableStateOf<GroupEntity?>(null) }
-    var discoveredBackups by remember { mutableStateOf<List<com.babysplit.app.core.gdrive.DriveBackupItem>>(emptyList()) }
 
     val dashboardDocumentPicker = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
@@ -71,15 +68,6 @@ fun DashboardScreen(
                     android.widget.Toast.makeText(context, "Failed to import backup: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
                 }
             }
-        }
-    }
-
-    LaunchedEffect(groups.isEmpty()) {
-        if (groups.isEmpty()) {
-            val backups = com.babysplit.app.core.gdrive.GoogleDriveBackupEngine.searchForDriveBackups(context, userEmail ?: "")
-            discoveredBackups = backups
-        } else {
-            discoveredBackups = emptyList()
         }
     }
 
@@ -133,96 +121,6 @@ fun DashboardScreen(
         ) {
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                // ☁️ Guest / Google Sync Status Bar Card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onProfileClick() },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (userEmail != null) SettledGreenLight else ChickYellowLight
-                    ),
-                    border = BorderStroke(1.dp, if (userEmail != null) Color(0xFFC8E6C9) else ChickGold)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Text(if (userEmail != null) "☁️" else "👤", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = if (userEmail != null) "Google Drive Linked" else "Guest Mode (Offline)",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    color = if (userEmail != null) SettledGreen else TextPrimary
-                                )
-                                Text(
-                                    text = if (userEmail != null) userEmail else "Tap to connect Google Drive backup",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Open Profile",
-                            tint = if (userEmail != null) SettledGreen else ChickAmber,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-
-            // Discovered Cloud Backups Card (if app was reinstalled or empty)
-            if (discoveredBackups.isNotEmpty() && groups.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = ChickYellowSubtle),
-                        border = BorderStroke(1.dp, ChickAmber)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("☁️", fontSize = 22.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        "${discoveredBackups.size} Cloud Backup Trip(s) Found!",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = TextPrimary
-                                    )
-                                    Text(
-                                        "Previous trips found on device & Drive. Tap below to restore everything.",
-                                        fontSize = 11.sp,
-                                        color = TextSecondary
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = { onRestoreDiscoveredBackups(discoveredBackups) },
-                                colors = ButtonDefaults.buttonColors(containerColor = SettledGreen, contentColor = Color.White),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Filled.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Restore All Trips Now 📥", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                        }
-                    }
-                }
             }
 
             item {

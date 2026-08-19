@@ -214,134 +214,13 @@ object GoogleDriveBackupEngine {
     }
 
     /**
-     * Exports and synchronizes user profile and payment settings directly to Google Drive Cloud.
+     * Searches all persistent storage directories and MediaStore for trip backups.
      */
-    suspend fun exportProfileToCloud(
-        context: Context,
-        userPrefs: com.babysplit.app.core.datastore.UserPreferencesDataStore
-    ): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val email = userPrefs.getUserEmailDirect()
-            val details = userPrefs.hostPaymentDetailsFlow.firstOrNull()
-            val currency = userPrefs.defaultCurrencyFlow.firstOrNull() ?: "USD"
-            val name = userPrefs.userNameFlow.firstOrNull() ?: "Host"
-
-            val json = JSONObject().apply {
-                put("version", 1)
-                put("userName", name)
-                put("userEmail", email ?: "")
-                put("bankName", details?.bankName ?: "")
-                put("accountHolderName", details?.accountHolderName ?: "")
-                put("bankAccountNumber", details?.bankAccountNumber ?: "")
-                put("eWalletName", details?.eWalletName ?: "")
-                put("eWalletHandle", details?.eWalletHandle ?: "")
-                put("customNote", details?.customNote ?: "")
-                put("defaultCurrency", currency)
-                put("updatedAtEpochMs", System.currentTimeMillis())
-            }
-
-            val jsonContent = json.toString(2)
-            val fileName = "user_profile_backup.json"
-
-            // 1. Upload to Google Drive Cloud
-            if (!email.isNullOrBlank()) {
-                val token = GoogleDriveCloudClient.getAccessToken(context, email)
-                if (!token.isNullOrBlank()) {
-                    GoogleDriveCloudClient.uploadOrUpdateBackup(token, fileName, jsonContent)
-                }
-            }
-
-            // 2. Save to MediaStore / shared storage
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                try {
-                    val resolver = context.contentResolver
-                    val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
-                    val contentValues = android.content.ContentValues().apply {
-                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "${android.os.Environment.DIRECTORY_DOWNLOADS}/BabySplit_Backups")
-                    }
-                    val uri = resolver.insert(collection, contentValues)
-                    if (uri != null) {
-                        resolver.openOutputStream(uri, "wt")?.use { stream ->
-                            stream.write(jsonContent.toByteArray(Charsets.UTF_8))
-                            stream.flush()
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-    /**
-     * Searches all persistent storage directories, Google Drive Cloud servers, and MediaStore for trip backups.
-     */
-    suspend fun searchForDriveBackups(context: Context, email: String): List<DriveBackupItem> = withContext(Dispatchers.IO) {
+    suspend fun searchForDriveBackups(context: Context, email: String = ""): List<DriveBackupItem> = withContext(Dispatchers.IO) {
         val backupsMap = mutableMapOf<String, DriveBackupItem>()
         val resolver = context.contentResolver
 
-        // 1. Search Google Drive Cloud servers directly (if email provided)
-        if (email.isNotBlank()) {
-            try {
-                val token = GoogleDriveCloudClient.getAccessToken(context, email)
-                if (!token.isNullOrBlank()) {
-                    val cloudBackups = GoogleDriveCloudClient.searchDriveFiles(token)
-                    for (item in cloudBackups) {
-                        val key = "${item.tripName.trim().lowercase()}_${item.emoji}"
-                        if (!backupsMap.containsKey(key) || (backupsMap[key]?.timestampMs ?: 0L) < item.timestampMs) {
-                            backupsMap[key] = item
-                        }
-                    }
-
-                    // Also check and restore user_profile_backup.json from Google Drive
-                    try {
-                        val query = java.net.URLEncoder.encode("name = 'user_profile_backup.json' and trashed = false", "UTF-8")
-                        val searchUrl = java.net.URL("https://www.googleapis.com/drive/v3/files?q=$query&fields=files(id)")
-                        val searchConn = (searchUrl.openConnection() as java.net.HttpURLConnection).apply {
-                            requestMethod = "GET"
-                            setRequestProperty("Authorization", "Bearer $token")
-                            connectTimeout = 8000
-                            readTimeout = 8000
-                        }
-                        if (searchConn.responseCode in 200..299) {
-                            val responseText = searchConn.inputStream.bufferedReader().use { it.readText() }
-                            val root = JSONObject(responseText)
-                            val files = root.optJSONArray("files")
-                            if (files != null && files.length() > 0) {
-                                val fileId = files.getJSONObject(0).getString("id")
-                                val profileJsonStr = GoogleDriveCloudClient.downloadFileContent(token, fileId)
-                                if (!profileJsonStr.isNullOrBlank()) {
-                                    val pJson = JSONObject(profileJsonStr)
-                                    val userPrefs = com.babysplit.app.core.datastore.UserPreferencesDataStore(context)
-                                    userPrefs.savePaymentDetails(
-                                        bankName = pJson.optString("bankName").ifBlank { null },
-                                        bankAccountHolder = pJson.optString("accountHolderName").ifBlank { null },
-                                        bankAccount = pJson.optString("bankAccountNumber").ifBlank { null },
-                                        eWalletName = pJson.optString("eWalletName").ifBlank { null },
-                                        eWalletHandle = pJson.optString("eWalletHandle").ifBlank { null },
-                                        paymentNote = pJson.optString("customNote").ifBlank { null },
-                                        defaultCurrency = pJson.optString("defaultCurrency", "USD")
-                                    )
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-
-        // 2. Search via MediaStore (reads files created by previous app installs)
+        // 1. Search via MediaStore (reads files created by previous app installs)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             try {
                 val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
