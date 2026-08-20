@@ -5,7 +5,10 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -37,31 +40,53 @@ class FirebaseAuthRepository(private val context: Context) {
     }
 
     /**
-     * Initiates Google Sign-In via Credential Manager bottom sheet.
-     * On success, signs into Firebase Auth and returns the FirebaseUser.
+     * Initiates Google Sign-In via Credential Manager.
+     * Uses GetSignInWithGoogleOption for explicit button clicks with GetGoogleIdOption fallback
+     * to eliminate first-attempt NoCredentialException.
      *
      * @param activityContext Must be an Activity Context to display the Credential Manager UI
      * @param webClientId The Web Client ID from Firebase Console (Authentication > Google > Web SDK config)
      */
     suspend fun signInWithGoogle(activityContext: Context, webClientId: String): Result<FirebaseUser> {
-        return try {
-            val credentialManager = CredentialManager.create(activityContext)
+        val credentialManager = CredentialManager.create(activityContext)
 
-            val googleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(webClientId)
-                .setAutoSelectEnabled(false)
-                .build()
+        val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(serverClientId = webClientId)
+            .build()
 
-            val request = GetCredentialRequest.Builder()
-                .addCredentialOption(googleIdOption)
-                .build()
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(false)
+            .setServerClientId(webClientId)
+            .setAutoSelectEnabled(false)
+            .build()
 
-            val result = credentialManager.getCredential(
+        val primaryRequest = GetCredentialRequest.Builder()
+            .addCredentialOption(signInWithGoogleOption)
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        val result: GetCredentialResponse = try {
+            credentialManager.getCredential(
                 context = activityContext,
-                request = request
+                request = primaryRequest
             )
+        } catch (_: NoCredentialException) {
+            // Fallback: If no credential found on initial attempt, retry explicitly with GetSignInWithGoogleOption
+            try {
+                val fallbackRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(signInWithGoogleOption)
+                    .build()
+                credentialManager.getCredential(
+                    context = activityContext,
+                    request = fallbackRequest
+                )
+            } catch (e: Exception) {
+                return Result.failure(e)
+            }
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
 
+        return try {
             val credential = result.credential
             if (credential is CustomCredential &&
                 credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
@@ -97,3 +122,4 @@ class FirebaseAuthRepository(private val context: Context) {
         }
     }
 }
+

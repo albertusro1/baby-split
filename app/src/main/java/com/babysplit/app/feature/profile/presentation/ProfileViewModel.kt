@@ -76,9 +76,13 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     _uiState.update { it.copy(isSigningIn = false, errorMessage = null) }
                 },
                 onFailure = { e ->
-                    e.printStackTrace()
-                    _uiState.update {
-                        it.copy(isSigningIn = false, errorMessage = "Sign-in failed: ${e.localizedMessage ?: e.message}")
+                    if (e is androidx.credentials.exceptions.GetCredentialCancellationException) {
+                        _uiState.update { it.copy(isSigningIn = false, errorMessage = null) }
+                    } else {
+                        e.printStackTrace()
+                        _uiState.update {
+                            it.copy(isSigningIn = false, errorMessage = "Sign-in failed: ${e.localizedMessage ?: e.message}")
+                        }
                     }
                 }
             )
