@@ -611,7 +611,7 @@ private fun BalancesTab(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Header Row: Label + Status Pill Badge
+                    // Header Row: Label (+ All Settled Up badge when completely settled)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -624,22 +624,20 @@ private fun BalancesTab(
                             color = if (totalDebtCents > 0) Color(0xFF7A4F00) else SettledGreen
                         )
 
-                        Surface(
-                            color = if (totalDebtCents > 0) ChickYellowSubtle else Color(0xFFE8F5E9),
-                            shape = RoundedCornerShape(100.dp),
-                            border = BorderStroke(1.dp, if (totalDebtCents > 0) ChickGold else Color(0xFF81C784))
-                        ) {
-                            Text(
-                                text = if (totalDebtCents > 0) {
-                                    "${simplifiedTransactions.size} payment${if (simplifiedTransactions.size > 1) "s" else ""} left"
-                                } else {
-                                    "All Settled Up"
-                                },
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (totalDebtCents > 0) Color(0xFF7A4F00) else SettledGreen,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
+                        if (totalDebtCents <= 0) {
+                            Surface(
+                                color = Color(0xFFE8F5E9),
+                                shape = RoundedCornerShape(100.dp),
+                                border = BorderStroke(1.dp, Color(0xFF81C784))
+                            ) {
+                                Text(
+                                    text = "All Settled Up",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SettledGreen,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
 
