@@ -1,10 +1,12 @@
 package com.babysplit.app.feature.group.presentation
 
 import android.content.Context
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -582,6 +584,9 @@ private fun BalancesTab(
     val totalDebtCents = remember(simplifiedTransactions) {
         simplifiedTransactions.sumOf { it.amountCents }
     }
+    var selectedJourneyMemberId by remember(members) {
+        mutableStateOf(members.firstOrNull()?.id ?: "")
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -1097,6 +1102,342 @@ private fun BalancesTab(
                                     )
                                 }
                                 Icon(Icons.Filled.Edit, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(12.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Detailed Member Spending Journey & Itemized Breakdown
+        if (members.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Column {
+                    Text(
+                        text = "🗺️ Member Spending Journey",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Select a member to explore their complete itemized trip breakdown",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Member Selector Chip Carousel
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(members) { m ->
+                            val isSelected = (selectedJourneyMemberId == m.id)
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { selectedJourneyMemberId = m.id },
+                                label = {
+                                    Text(
+                                        text = m.name,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                leadingIcon = {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (isSelected) ChickAmber else SurfaceBorderLight,
+                                        modifier = Modifier.size(18.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = m.name.take(1).uppercase(),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSelected) Color.White else TextSecondary
+                                            )
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(20.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ChickYellowSubtle,
+                                    selectedLabelColor = Color(0xFF7A4F00)
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    borderColor = if (isSelected) ChickGold else SurfaceBorderLight,
+                                    selectedBorderColor = ChickGold,
+                                    enabled = true,
+                                    selected = isSelected
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Detailed Journey Card for Selected Member
+            val selectedMember = members.firstOrNull { it.id == selectedJourneyMemberId } ?: members.first()
+            val memberBalance = balances.firstOrNull { it.memberId == selectedMember.id }
+            val memberPaidCents = expenses.filter { it.paidByMemberId == selectedMember.id && !it.isSettlement }.sumOf { it.totalAmountCents }
+            val memberConsumedShareCents = expenses.filter { !it.isSettlement }.flatMap { it.participants }.filter { it.memberId == selectedMember.id }.sumOf { it.amountCents }
+            val netCents = memberBalance?.netBalanceCents ?: (memberPaidCents - memberConsumedShareCents)
+
+            val memberExpenses = remember(expenses, selectedMember) {
+                expenses.filter { exp ->
+                    exp.paidByMemberId == selectedMember.id || exp.participants.any { it.memberId == selectedMember.id }
+                }.sortedByDescending { it.createdAtEpochMs }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+                    border = BorderStroke(1.dp, SurfaceBorderLight)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        // Header: Member Name & Overall Journey Status
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (netCents > 0) Color(0xFFE8F5E9) else if (netCents < 0) Color(0xFFFFEBEE) else BackgroundLight,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = selectedMember.name.take(1).uppercase(),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = if (netCents > 0) SettledGreen else if (netCents < 0) DebtRed else TextSecondary
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "${selectedMember.name}'s Breakdown",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        text = "${memberExpenses.size} activity record${if (memberExpenses.size != 1) "s" else ""}",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(100.dp),
+                                color = if (netCents > 0) Color(0xFFE8F5E9) else if (netCents < 0) Color(0xFFFFEBEE) else BackgroundLight,
+                                border = BorderStroke(1.dp, if (netCents > 0) Color(0xFF81C784) else if (netCents < 0) Color(0xFFE57373) else SurfaceBorderLight)
+                            ) {
+                                Text(
+                                    text = when {
+                                        netCents > 0 -> "+${BillSummaryFormatter.formatCents(netCents, currency)}"
+                                        netCents < 0 -> "-${BillSummaryFormatter.formatCents(-netCents, currency)}"
+                                        else -> "Settled"
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (netCents > 0) SettledGreen else if (netCents < 0) DebtRed else TextSecondary,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        // 3 Key Financial Metrics
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Paid Out
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = ChickYellowSubtle,
+                                border = BorderStroke(1.dp, ChickGold),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("PAID OUT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7A4F00))
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = BillSummaryFormatter.formatCents(memberPaidCents, currency),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color(0xFF7A4F00),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+
+                            // Personal Share
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFF3F4F6),
+                                border = BorderStroke(1.dp, SurfaceBorderLight),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("FAIR SHARE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = BillSummaryFormatter.formatCents(memberConsumedShareCents, currency),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = TextPrimary,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+
+                            // Net Balance
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (netCents >= 0) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                border = BorderStroke(1.dp, if (netCents >= 0) Color(0xFFC8E6C9) else Color(0xFFFFCDD2)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(if (netCents >= 0) "GETS BACK" else "OWES", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (netCents >= 0) SettledGreen else DebtRed)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = BillSummaryFormatter.formatCents(kotlin.math.abs(netCents), currency),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (netCents >= 0) SettledGreen else DebtRed,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = SurfaceBorderLight.copy(alpha = 0.6f))
+
+                        // Itemized Timeline of Expenses
+                        if (memberExpenses.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 20.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No expenses linked to ${selectedMember.name} yet.",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "📜 Itemized History",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary
+                                )
+
+                                memberExpenses.forEach { exp ->
+                                    val isPayer = (exp.paidByMemberId == selectedMember.id)
+                                    val part = exp.participants.firstOrNull { it.memberId == selectedMember.id }
+                                    val myShareCents = part?.amountCents ?: 0L
+                                    val category = ExpenseCategory.fromName(exp.categoryName)
+                                    val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(exp.createdAtEpochMs))
+
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = BackgroundLight,
+                                        border = BorderStroke(1.dp, SurfaceBorderLight.copy(alpha = 0.6f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = if (exp.isSettlement) Color(0xFFE8F5E9) else ChickYellowLight,
+                                                    modifier = Modifier.size(34.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text(if (exp.isSettlement) "💸" else category.emoji, fontSize = 16.sp)
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(10.dp))
+                                                Column {
+                                                    Text(
+                                                        text = exp.title,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp,
+                                                        color = TextPrimary,
+                                                        maxLines = 1
+                                                    )
+                                                    val subtext = if (exp.isSettlement) {
+                                                        if (isPayer) "Settlement sent to ${exp.participants.firstOrNull()?.memberName ?: "member"}"
+                                                        else "Settlement received from ${exp.paidByMemberName}"
+                                                    } else {
+                                                        if (isPayer) {
+                                                            "Paid ${BillSummaryFormatter.formatCents(exp.totalAmountCents, currency)} • Share: ${BillSummaryFormatter.formatCents(myShareCents, currency)}"
+                                                        } else {
+                                                            "Paid by ${exp.paidByMemberName} • Share: ${BillSummaryFormatter.formatCents(myShareCents, currency)}"
+                                                        }
+                                                    }
+                                                    Text(
+                                                        text = "$dateStr • $subtext",
+                                                        fontSize = 11.sp,
+                                                        color = TextSecondary,
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+
+                                            // Net impact tag for this item
+                                            val impactCents = if (exp.isSettlement) {
+                                                if (isPayer) exp.totalAmountCents else -exp.totalAmountCents
+                                            } else {
+                                                if (isPayer) (exp.totalAmountCents - myShareCents) else -myShareCents
+                                            }
+
+                                            Text(
+                                                text = if (impactCents >= 0) "+${BillSummaryFormatter.formatCents(impactCents, currency)}"
+                                                       else "-${BillSummaryFormatter.formatCents(-impactCents, currency)}",
+                                                fontWeight = FontWeight.ExtraBold,
+                                                fontSize = 13.sp,
+                                                color = if (impactCents >= 0) SettledGreen else DebtRed
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
