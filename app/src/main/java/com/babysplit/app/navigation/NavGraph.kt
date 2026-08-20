@@ -134,6 +134,10 @@ fun NavGraph(
             }
             val groupState by groupDetailViewModel.uiState.collectAsState()
 
+            LaunchedEffect(groupState.members, paymentDetails) {
+                groupDetailViewModel.syncLocalUserPaymentDetails(paymentDetails)
+            }
+
             var showInviteSheet by remember { mutableStateOf(false) }
 
             GroupDetailScreen(

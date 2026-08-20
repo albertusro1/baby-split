@@ -246,7 +246,16 @@ class FirestoreTripRepository(
         db.collection("trips").document(tripId).collection("expenses").document(expenseId).delete().await()
     }
 
-    override suspend fun joinTripByInviteCode(code: String, userId: String, userName: String): Result<String> {
+    override suspend fun joinTripByInviteCode(
+        code: String,
+        userId: String,
+        userName: String,
+        bankName: String?,
+        accountHolderName: String?,
+        bankAccountNumber: String?,
+        eWalletName: String?,
+        eWalletHandle: String?
+    ): Result<String> {
         return try {
             val snapshot = db.collection("trips").whereEqualTo("inviteCode", code).get().await()
             if (snapshot.isEmpty) {
@@ -256,13 +265,38 @@ class FirestoreTripRepository(
             val tripDoc = snapshot.documents.first()
             val tripId = tripDoc.id
 
+            // Check if user has saved payment details in user doc if not passed
+            var finalBankName = bankName
+            var finalHolderName = accountHolderName
+            var finalBankAcc = bankAccountNumber
+            var finalWalletName = eWalletName
+            var finalWalletHandle = eWalletHandle
+
+            if (finalBankAcc.isNullOrBlank() && finalWalletHandle.isNullOrBlank()) {
+                try {
+                    val userDoc = db.collection("users").document(userId).get().await()
+                    if (userDoc.exists()) {
+                        finalBankName = userDoc.getString("bankName")
+                        finalHolderName = userDoc.getString("accountHolderName") ?: userName
+                        finalBankAcc = userDoc.getString("bankAccountNumber")
+                        finalWalletName = userDoc.getString("eWalletName")
+                        finalWalletHandle = userDoc.getString("eWalletHandle")
+                    }
+                } catch (_: Exception) {}
+            }
+
             val memberId = UUID.randomUUID().toString()
-            val memberMap = mapOf(
+            val memberMap = mutableMapOf<String, Any?>(
                 "name" to userName,
                 "memberType" to "CLOUD_USER",
                 "firebaseUid" to userId,
                 "role" to "member",
-                "avatarColorHex" to "#3F51B5"
+                "avatarColorHex" to "#3F51B5",
+                "bankName" to finalBankName,
+                "accountHolderName" to (finalHolderName ?: userName),
+                "bankAccountNumber" to finalBankAcc,
+                "eWalletName" to finalWalletName,
+                "eWalletHandle" to finalWalletHandle
             )
 
             db.runBatch { batch ->

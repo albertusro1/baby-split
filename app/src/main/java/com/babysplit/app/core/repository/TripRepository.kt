@@ -91,6 +91,15 @@ interface TripRepository {
     suspend fun deleteExpense(tripId: String, expenseId: String)
 
     // --- Sharing (only applicable for cloud repository, local returns failure) ---
-    suspend fun joinTripByInviteCode(code: String, userId: String, userName: String): Result<String>
+    suspend fun joinTripByInviteCode(
+        code: String,
+        userId: String,
+        userName: String,
+        bankName: String? = null,
+        accountHolderName: String? = null,
+        bankAccountNumber: String? = null,
+        eWalletName: String? = null,
+        eWalletHandle: String? = null
+    ): Result<String>
     suspend fun generateInviteCode(tripId: String): String
 }

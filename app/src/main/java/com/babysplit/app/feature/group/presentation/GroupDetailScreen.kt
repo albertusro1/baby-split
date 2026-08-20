@@ -846,19 +846,24 @@ private fun BalancesTab(
                                         val creditor = members.firstOrNull { it.name == tx.creditorName }
                                         val isHostCreditor = creditor?.memberType == "HOST" ||
                                             creditor?.name?.contains("Host", ignoreCase = true) == true ||
-                                            (paymentDetails != null && creditor?.name.equals(paymentDetails.hostName, ignoreCase = true))
+                                            creditor?.name?.contains("You", ignoreCase = true) == true ||
+                                            (paymentDetails != null && (
+                                                creditor?.name.equals(paymentDetails.hostName, ignoreCase = true) ||
+                                                creditor?.name.equals(paymentDetails.accountHolderName, ignoreCase = true)
+                                            ))
 
-                                        val bankName = creditor?.bankName ?: if (isHostCreditor) paymentDetails?.bankName else null
-                                        val bankAcc = creditor?.bankAccountNumber ?: if (isHostCreditor) paymentDetails?.bankAccountNumber else null
-                                        val walletName = creditor?.eWalletName ?: if (isHostCreditor) paymentDetails?.eWalletName else null
-                                        val walletHandle = creditor?.eWalletHandle ?: if (isHostCreditor) paymentDetails?.eWalletHandle else null
+                                        val bankName = creditor?.bankName?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.bankName else null
+                                        val bankAcc = creditor?.bankAccountNumber?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.bankAccountNumber else null
+                                        val walletName = creditor?.eWalletName?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.eWalletName else null
+                                        val walletHandle = creditor?.eWalletHandle?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.eWalletHandle else null
+                                        val holderName = creditor?.accountHolderName?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.accountHolderName else creditor?.name
 
                                         val sb = java.lang.StringBuilder()
                                         sb.appendLine("👋 Hi *${tx.debtorName}*, here is a quick settlement reminder for *${groupName}*:")
                                         sb.appendLine("💵 Amount to transfer: *${BillSummaryFormatter.formatCents(tx.amountCents, currency)}*")
                                         sb.appendLine("👤 Transfer to: *${tx.creditorName}*")
                                         if (!bankAcc.isNullOrBlank()) {
-                                            sb.appendLine("💳 *${bankName ?: "Bank"}*: $bankAcc (a.n. ${creditor?.accountHolderName ?: tx.creditorName})")
+                                            sb.appendLine("💳 *${bankName ?: "Bank"}*: $bankAcc (a.n. ${holderName ?: tx.creditorName})")
                                         } else if (!walletHandle.isNullOrBlank()) {
                                             sb.appendLine("📱 *${walletName ?: "E-Wallet"}*: $walletHandle")
                                         }
@@ -900,16 +905,21 @@ private fun BalancesTab(
                         val creditor = members.firstOrNull { it.name == tx.creditorName }
                         val isHostCreditor = creditor?.memberType == "HOST" ||
                             creditor?.name?.contains("Host", ignoreCase = true) == true ||
-                            (paymentDetails != null && creditor?.name.equals(paymentDetails.hostName, ignoreCase = true))
+                            creditor?.name?.contains("You", ignoreCase = true) == true ||
+                            (paymentDetails != null && (
+                                creditor?.name.equals(paymentDetails.hostName, ignoreCase = true) ||
+                                creditor?.name.equals(paymentDetails.accountHolderName, ignoreCase = true)
+                            ))
 
-                        val bankName = creditor?.bankName ?: if (isHostCreditor) paymentDetails?.bankName else null
-                        val bankAcc = creditor?.bankAccountNumber ?: if (isHostCreditor) paymentDetails?.bankAccountNumber else null
-                        val walletName = creditor?.eWalletName ?: if (isHostCreditor) paymentDetails?.eWalletName else null
-                        val walletHandle = creditor?.eWalletHandle ?: if (isHostCreditor) paymentDetails?.eWalletHandle else null
+                        val bankName = creditor?.bankName?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.bankName else null
+                        val bankAcc = creditor?.bankAccountNumber?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.bankAccountNumber else null
+                        val walletName = creditor?.eWalletName?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.eWalletName else null
+                        val walletHandle = creditor?.eWalletHandle?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.eWalletHandle else null
+                        val holderName = creditor?.accountHolderName?.takeIf { it.isNotBlank() } ?: if (isHostCreditor) paymentDetails?.accountHolderName else creditor?.name
 
                         if (!bankAcc.isNullOrBlank() || !walletHandle.isNullOrBlank()) {
                             val transferText = if (!bankAcc.isNullOrBlank()) {
-                                "${bankName ?: "Bank"}: $bankAcc (a.n. ${creditor?.accountHolderName ?: tx.creditorName})"
+                                "${bankName ?: "Bank"}: $bankAcc (a.n. ${holderName ?: tx.creditorName})"
                             } else {
                                 "${walletName ?: "E-Wallet"}: $walletHandle"
                             }
@@ -1065,12 +1075,16 @@ private fun BalancesTab(
                         val isHost = member.memberType == "HOST" ||
                             member.name.contains("Host", ignoreCase = true) ||
                             member.name.contains("You", ignoreCase = true) ||
-                            (paymentDetails != null && member.name.equals(paymentDetails.hostName, ignoreCase = true))
+                            (paymentDetails != null && (
+                                member.name.equals(paymentDetails.hostName, ignoreCase = true) ||
+                                member.name.equals(paymentDetails.accountHolderName, ignoreCase = true)
+                            ))
 
-                        val effBank = member.bankName ?: if (isHost) paymentDetails?.bankName else null
-                        val effAccount = member.bankAccountNumber ?: if (isHost) paymentDetails?.bankAccountNumber else null
-                        val effWallet = member.eWalletName ?: if (isHost) paymentDetails?.eWalletName else null
-                        val effHandle = member.eWalletHandle ?: if (isHost) paymentDetails?.eWalletHandle else null
+                        val effBank = member.bankName?.takeIf { it.isNotBlank() } ?: if (isHost) paymentDetails?.bankName else null
+                        val effAccount = member.bankAccountNumber?.takeIf { it.isNotBlank() } ?: if (isHost) paymentDetails?.bankAccountNumber else null
+                        val effWallet = member.eWalletName?.takeIf { it.isNotBlank() } ?: if (isHost) paymentDetails?.eWalletName else null
+                        val effHandle = member.eWalletHandle?.takeIf { it.isNotBlank() } ?: if (isHost) paymentDetails?.eWalletHandle else null
+                        val effHolder = member.accountHolderName?.takeIf { it.isNotBlank() } ?: if (isHost) paymentDetails?.accountHolderName else member.name
 
                         val hasBank = !effAccount.isNullOrBlank() || !effHandle.isNullOrBlank()
                         Surface(
@@ -1086,19 +1100,24 @@ private fun BalancesTab(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                     Icon(Icons.Filled.AccountBalance, contentDescription = null, tint = ChickAmber, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = if (hasBank) {
-                                            val bankText = if (!effAccount.isNullOrBlank()) "${effBank ?: "Bank"}: $effAccount" else "${effWallet ?: "E-Wallet"}: $effHandle"
+                                            val bankText = if (!effAccount.isNullOrBlank()) {
+                                                "${effBank ?: "Bank"}: $effAccount (a.n. ${effHolder ?: member.name})"
+                                            } else {
+                                                "${effWallet ?: "E-Wallet"}: $effHandle"
+                                            }
                                             "💳 $bankText"
                                         } else {
                                             "+ Add Transfer Info (Bank / QRIS)"
                                         },
                                         fontSize = 11.sp,
                                         color = if (hasBank) Color(0xFF7A4F00) else TextSecondary,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1
                                     )
                                 }
                                 Icon(Icons.Filled.Edit, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(12.dp))

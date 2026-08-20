@@ -10,6 +10,7 @@ import com.babysplit.app.core.whatsapp.HostPaymentDetails
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 data class ProfileUiState(
     val isSignedIn: Boolean = false,
@@ -111,12 +112,13 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 eWalletName, eWalletHandle, paymentNote, defaultCurrency
             )
 
-            // Also update all HOST members in local Room DB
+            // 1. Update all HOST / current user members in local Room DB
             val allGroups = app.database.groupDao().getAllGroupsDirect()
+            val currentUserName = _uiState.value.userName
             for (g in allGroups) {
                 val members = app.database.memberDao().getMembersForGroupDirect(g.id)
                 for (m in members) {
-                    if (m.memberType == "HOST" || m.name.contains("Host", ignoreCase = true) || m.name.contains("You", ignoreCase = true)) {
+                    if (m.memberType == "HOST" || m.name.equals(currentUserName, ignoreCase = true) || m.name.contains("Host", ignoreCase = true) || m.name.contains("You", ignoreCase = true)) {
                         app.database.memberDao().updateMember(
                             m.copy(
                                 bankName = bankName,
@@ -127,6 +129,52 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                             )
                         )
                     }
+                }
+            }
+
+            // 2. If signed in, sync to Firestore /users/{uid} and all trips containing this user
+            val currentUser = authRepository.getCurrentUser()
+            if (currentUser != null) {
+                try {
+                    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    val userMap = mutableMapOf<String, Any?>(
+                        "name" to (_uiState.value.userName.ifBlank { currentUser.displayName ?: "User" }),
+                        "email" to currentUser.email,
+                        "bankName" to bankName,
+                        "accountHolderName" to (bankAccountHolder ?: _uiState.value.userName),
+                        "bankAccountNumber" to bankAccount,
+                        "eWalletName" to eWalletName,
+                        "eWalletHandle" to eWalletHandle,
+                        "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                    )
+                    db.collection("users").document(currentUser.uid).set(userMap, com.google.firebase.firestore.SetOptions.merge())
+
+                    // Update all trips where this user is a member
+                    val tripsSnapshot = db.collection("trips")
+                        .whereArrayContains("memberIds", currentUser.uid)
+                        .get()
+                        .await()
+
+                    for (tripDoc in tripsSnapshot.documents) {
+                        val membersSnapshot = tripDoc.reference.collection("members")
+                            .whereEqualTo("firebaseUid", currentUser.uid)
+                            .get()
+                            .await()
+
+                        for (memberDoc in membersSnapshot.documents) {
+                            memberDoc.reference.update(
+                                mapOf(
+                                    "bankName" to bankName,
+                                    "accountHolderName" to (bankAccountHolder ?: _uiState.value.userName),
+                                    "bankAccountNumber" to bankAccount,
+                                    "eWalletName" to eWalletName,
+                                    "eWalletHandle" to eWalletHandle
+                                )
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }

@@ -64,6 +64,38 @@ class GroupDetailViewModel(
         }
     }
 
+    fun syncLocalUserPaymentDetails(paymentDetails: com.babysplit.app.core.whatsapp.HostPaymentDetails?) {
+        if (paymentDetails == null) return
+        val hasBank = !paymentDetails.bankAccountNumber.isNullOrBlank() || !paymentDetails.eWalletHandle.isNullOrBlank()
+        if (!hasBank) return
+
+        viewModelScope.launch {
+            try {
+                val currentMembers = _uiState.value.members
+                val myMember = currentMembers.firstOrNull { m ->
+                    (currentUserId.isNotBlank() && m.firebaseUid == currentUserId) ||
+                    m.name.equals(paymentDetails.hostName, ignoreCase = true) ||
+                    m.memberType == "HOST"
+                }
+
+                if (myMember != null && myMember.bankAccountNumber.isNullOrBlank() && myMember.eWalletHandle.isNullOrBlank()) {
+                    repository.updateMember(
+                        tripId,
+                        myMember.copy(
+                            bankName = paymentDetails.bankName ?: myMember.bankName,
+                            accountHolderName = paymentDetails.accountHolderName ?: myMember.accountHolderName ?: myMember.name,
+                            bankAccountNumber = paymentDetails.bankAccountNumber ?: myMember.bankAccountNumber,
+                            eWalletName = paymentDetails.eWalletName ?: myMember.eWalletName,
+                            eWalletHandle = paymentDetails.eWalletHandle ?: myMember.eWalletHandle
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     fun addMember(
         name: String,
         memberType: String = "OFFLINE_TAGGED",

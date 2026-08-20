@@ -168,10 +168,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 return@launch
             }
 
+            val paymentDetails = app.userPreferences.hostPaymentDetailsFlow.firstOrNull()
+
             val result = _activeRepository.joinTripByInviteCode(
                 code = code.uppercase().trim(),
                 userId = user.uid,
-                userName = user.displayName ?: "Guest"
+                userName = user.displayName ?: "Guest",
+                bankName = paymentDetails?.bankName,
+                accountHolderName = paymentDetails?.accountHolderName ?: user.displayName ?: "Guest",
+                bankAccountNumber = paymentDetails?.bankAccountNumber,
+                eWalletName = paymentDetails?.eWalletName,
+                eWalletHandle = paymentDetails?.eWalletHandle
             )
 
             result.fold(

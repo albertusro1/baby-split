@@ -305,7 +305,12 @@ class LocalTripRepository(
     override suspend fun joinTripByInviteCode(
         code: String,
         userId: String,
-        userName: String
+        userName: String,
+        bankName: String?,
+        accountHolderName: String?,
+        bankAccountNumber: String?,
+        eWalletName: String?,
+        eWalletHandle: String?
     ): Result<String> {
         return Result.failure(UnsupportedOperationException("Sharing is not available in offline mode"))
     }
