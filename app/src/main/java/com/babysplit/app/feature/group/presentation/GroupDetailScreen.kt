@@ -75,6 +75,9 @@ fun GroupDetailScreen(
     var showAddMemberDialog by remember { mutableStateOf(false) }
     var editingPaymentMember by remember { mutableStateOf<MemberData?>(null) }
     var showSettlementDialog by remember { mutableStateOf(false) }
+    var prefillSettlementPayerId by remember { mutableStateOf<String?>(null) }
+    var prefillSettlementReceiverId by remember { mutableStateOf<String?>(null) }
+    var prefillSettlementAmountCents by remember { mutableStateOf<Long?>(null) }
     var showFinishTripDialog by remember { mutableStateOf(false) }
     var showDeleteTripDialog by remember { mutableStateOf(false) }
 
@@ -233,7 +236,12 @@ fun GroupDetailScreen(
                     expenses = expenses,
                     paymentDetails = paymentDetails,
                     onAddMemberClick = { showAddMemberDialog = true },
-                    onSettleUpClick = { showSettlementDialog = true },
+                    onSettleUpClick = { payerId, receiverId, amountCents ->
+                        prefillSettlementPayerId = payerId
+                        prefillSettlementReceiverId = receiverId
+                        prefillSettlementAmountCents = amountCents
+                        showSettlementDialog = true
+                    },
                     onEditMemberPayment = { editingPaymentMember = it }
                 )
                 2 -> TotalsTab(
@@ -306,10 +314,21 @@ fun GroupDetailScreen(
         RecordSettlementDialog(
             members = members,
             currency = group.currency,
-            onDismiss = { showSettlementDialog = false },
+            initialPayerId = prefillSettlementPayerId,
+            initialReceiverId = prefillSettlementReceiverId,
+            initialAmountCents = prefillSettlementAmountCents,
+            onDismiss = {
+                showSettlementDialog = false
+                prefillSettlementPayerId = null
+                prefillSettlementReceiverId = null
+                prefillSettlementAmountCents = null
+            },
             onConfirm = { payerId, receiverId, amountCents ->
                 onRecordSettlement(payerId, receiverId, amountCents)
                 showSettlementDialog = false
+                prefillSettlementPayerId = null
+                prefillSettlementReceiverId = null
+                prefillSettlementAmountCents = null
             }
         )
     }
@@ -556,7 +575,7 @@ private fun BalancesTab(
     expenses: List<ExpenseData>,
     paymentDetails: HostPaymentDetails?,
     onAddMemberClick: () -> Unit = {},
-    onSettleUpClick: () -> Unit,
+    onSettleUpClick: (payerId: String?, receiverId: String?, amountCents: Long?) -> Unit,
     onEditMemberPayment: (MemberData) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -574,58 +593,70 @@ private fun BalancesTab(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (totalDebtCents > 0) SurfaceElevatedLight else Color(0xFFF1F8E9)
+                    containerColor = if (totalDebtCents > 0) Color(0xFFFFFDF7) else Color(0xFFF1F8E9)
                 ),
                 border = BorderStroke(
                     1.dp,
-                    if (totalDebtCents > 0) ChickGold else Color(0xFFC8E6C9)
+                    if (totalDebtCents > 0) ChickGold.copy(alpha = 0.8f) else Color(0xFFC8E6C9)
                 )
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // Header Row: Label + Status Pill Badge
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = if (totalDebtCents > 0) "Outstanding Debts" else "Settlement Status",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextSecondary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (totalDebtCents > 0) "⚖️ Remaining Debts" else "🎉 Settlement Status",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (totalDebtCents > 0) Color(0xFF7A4F00) else SettledGreen
+                        )
+
+                        Surface(
+                            color = if (totalDebtCents > 0) ChickYellowSubtle else Color(0xFFE8F5E9),
+                            shape = RoundedCornerShape(100.dp),
+                            border = BorderStroke(1.dp, if (totalDebtCents > 0) ChickGold else Color(0xFF81C784))
+                        ) {
                             Text(
                                 text = if (totalDebtCents > 0) {
-                                    BillSummaryFormatter.formatCents(totalDebtCents, currency)
+                                    "${simplifiedTransactions.size} payment${if (simplifiedTransactions.size > 1) "s" else ""} left"
                                 } else {
-                                    "All Settled Up! 🎉"
+                                    "All Settled Up"
                                 },
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = if (totalDebtCents > 0) ChickAmber else SettledGreen
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (totalDebtCents > 0) Color(0xFF7A4F00) else SettledGreen,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
+                    }
 
+                    // Amount Display
+                    Column {
+                        Text(
+                            text = if (totalDebtCents > 0) {
+                                BillSummaryFormatter.formatCents(totalDebtCents, currency)
+                            } else {
+                                "Rp 0"
+                            },
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (totalDebtCents > 0) ChickAmber else SettledGreen
+                        )
                         if (totalDebtCents > 0) {
-                            Surface(
-                                color = ChickYellowSubtle,
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, ChickGold)
-                            ) {
-                                Text(
-                                    text = "${simplifiedTransactions.size} payment${if (simplifiedTransactions.size > 1) "s" else ""} left",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF7A4F00),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
-                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Total outstanding amount between group members",
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
                         }
                     }
 
@@ -635,13 +666,13 @@ private fun BalancesTab(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
-                            onClick = onSettleUpClick,
+                            onClick = { onSettleUpClick(null, null, null) },
                             colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1.2f),
                             contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
-                            Icon(Icons.Filled.Payment, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Record Settlement", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
@@ -661,9 +692,10 @@ private fun BalancesTab(
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = WhatsAppDarkGreen),
                             border = BorderStroke(1.dp, WhatsAppGreen),
                             shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+                            modifier = Modifier.weight(0.9f),
+                            contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
-                            Icon(Icons.Filled.Share, contentDescription = null, tint = WhatsAppDarkGreen, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.Share, contentDescription = null, tint = WhatsAppDarkGreen, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Share WA", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
@@ -672,7 +704,7 @@ private fun BalancesTab(
             }
         }
 
-        // 2. Simplified Debts Section
+        // 2. Simplified Debts Section (Who Pays Whom)
         if (simplifiedTransactions.isNotEmpty()) {
             item {
                 Text(
@@ -686,49 +718,228 @@ private fun BalancesTab(
             items(simplifiedTransactions) { tx ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = SurfaceLight),
                     border = BorderStroke(1.dp, SurfaceBorderLight)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFFFFEBEE),
-                                modifier = Modifier.size(38.dp)
+                        // Top: Visual Transfer Route (Debtor ➔ Arrow ➔ Creditor)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // Debtor (Sender)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text("💸", fontSize = 18.sp)
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFFFEBEE),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = tx.debtorName.take(1).uppercase(),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = DebtRed
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = tx.debtorName,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        color = TextPrimary
+                                    )
+                                    Text("Owes / Pays", fontSize = 10.sp, color = DebtRed, fontWeight = FontWeight.SemiBold)
                                 }
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(tx.debtorName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                                    Text(" ➔ ", color = TextSecondary, fontSize = 12.sp)
-                                    Text(tx.creditorName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+
+                            // Center Transfer Direction Icon
+                            Surface(
+                                shape = CircleShape,
+                                color = ChickYellowSubtle,
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowForward,
+                                        contentDescription = "pays to",
+                                        tint = ChickAmber,
+                                        modifier = Modifier.size(15.dp)
+                                    )
                                 }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "needs to transfer",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary
-                                )
+                            }
+
+                            // Creditor (Recipient)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.End,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = tx.creditorName,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        color = TextPrimary
+                                    )
+                                    Text("Receives", fontSize = 10.sp, color = SettledGreen, fontWeight = FontWeight.SemiBold)
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFE8F5E9),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = tx.creditorName.take(1).uppercase(),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = SettledGreen
+                                        )
+                                    }
+                                }
                             }
                         }
 
-                        Text(
-                            text = BillSummaryFormatter.formatCents(tx.amountCents, currency),
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 16.sp,
-                            color = ChickAmber
-                        )
+                        HorizontalDivider(color = SurfaceBorderLight.copy(alpha = 0.6f))
+
+                        // Bottom: Amount and Quick Actions Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Transfer Amount", fontSize = 11.sp, color = TextSecondary)
+                                Text(
+                                    text = BillSummaryFormatter.formatCents(tx.amountCents, currency),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 17.sp,
+                                    color = ChickAmber
+                                )
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // Quick WhatsApp Reminder Button
+                                OutlinedButton(
+                                    onClick = {
+                                        val creditor = members.firstOrNull { it.name == tx.creditorName }
+                                        val isHostCreditor = creditor?.memberType == "HOST" ||
+                                            creditor?.name?.contains("Host", ignoreCase = true) == true ||
+                                            (paymentDetails != null && creditor?.name.equals(paymentDetails.hostName, ignoreCase = true))
+
+                                        val bankName = creditor?.bankName ?: if (isHostCreditor) paymentDetails?.bankName else null
+                                        val bankAcc = creditor?.bankAccountNumber ?: if (isHostCreditor) paymentDetails?.bankAccountNumber else null
+                                        val walletName = creditor?.eWalletName ?: if (isHostCreditor) paymentDetails?.eWalletName else null
+                                        val walletHandle = creditor?.eWalletHandle ?: if (isHostCreditor) paymentDetails?.eWalletHandle else null
+
+                                        val sb = java.lang.StringBuilder()
+                                        sb.appendLine("👋 Hi *${tx.debtorName}*, here is a quick settlement reminder for *${groupName}*:")
+                                        sb.appendLine("💵 Amount to transfer: *${BillSummaryFormatter.formatCents(tx.amountCents, currency)}*")
+                                        sb.appendLine("👤 Transfer to: *${tx.creditorName}*")
+                                        if (!bankAcc.isNullOrBlank()) {
+                                            sb.appendLine("💳 *${bankName ?: "Bank"}*: $bankAcc (a.n. ${creditor?.accountHolderName ?: tx.creditorName})")
+                                        } else if (!walletHandle.isNullOrBlank()) {
+                                            sb.appendLine("📱 *${walletName ?: "E-Wallet"}*: $walletHandle")
+                                        }
+                                        sb.appendLine("----------------------------------------")
+                                        sb.appendLine("Thank you! 🙏")
+
+                                        val debtorMember = members.firstOrNull { it.name == tx.debtorName }
+                                        WhatsAppShareHelper.shareToWhatsApp(context, sb.toString().trim(), debtorMember?.phoneNumber)
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WhatsAppDarkGreen),
+                                    border = BorderStroke(1.dp, WhatsAppGreen),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Icon(Icons.Filled.Share, contentDescription = null, tint = WhatsAppDarkGreen, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Remind", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                // Quick Settle Button
+                                Button(
+                                    onClick = {
+                                        onSettleUpClick(tx.debtorId, tx.creditorId, tx.amountCents)
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = ChickAmber, contentColor = Color.White),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Settle", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        // Bank / Payment Info Tag if Creditor Has Bank Account
+                        val creditor = members.firstOrNull { it.name == tx.creditorName }
+                        val isHostCreditor = creditor?.memberType == "HOST" ||
+                            creditor?.name?.contains("Host", ignoreCase = true) == true ||
+                            (paymentDetails != null && creditor?.name.equals(paymentDetails.hostName, ignoreCase = true))
+
+                        val bankName = creditor?.bankName ?: if (isHostCreditor) paymentDetails?.bankName else null
+                        val bankAcc = creditor?.bankAccountNumber ?: if (isHostCreditor) paymentDetails?.bankAccountNumber else null
+                        val walletName = creditor?.eWalletName ?: if (isHostCreditor) paymentDetails?.eWalletName else null
+                        val walletHandle = creditor?.eWalletHandle ?: if (isHostCreditor) paymentDetails?.eWalletHandle else null
+
+                        if (!bankAcc.isNullOrBlank() || !walletHandle.isNullOrBlank()) {
+                            val transferText = if (!bankAcc.isNullOrBlank()) {
+                                "${bankName ?: "Bank"}: $bankAcc (a.n. ${creditor?.accountHolderName ?: tx.creditorName})"
+                            } else {
+                                "${walletName ?: "E-Wallet"}: $walletHandle"
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = ChickYellowSubtle,
+                                border = BorderStroke(1.dp, ChickGold),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Bank Account", bankAcc ?: walletHandle))
+                                        android.widget.Toast.makeText(context, "Account details copied!", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Icon(Icons.Filled.AccountBalance, contentDescription = null, tint = ChickAmber, modifier = Modifier.size(13.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "💳 $transferText",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF7A4F00),
+                                            maxLines = 1
+                                        )
+                                    }
+                                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", tint = Color(0xFF7A4F00), modifier = Modifier.size(13.dp))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -742,7 +953,7 @@ private fun BalancesTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "👥 Individual Balances (${members.size})",
+                    text = "👥 Member Net Balances (${members.size})",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = TextPrimary

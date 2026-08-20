@@ -24,14 +24,28 @@ import kotlin.math.roundToLong
 fun RecordSettlementDialog(
     members: List<MemberData>,
     currency: String,
+    initialPayerId: String? = null,
+    initialReceiverId: String? = null,
+    initialAmountCents: Long? = null,
     onDismiss: () -> Unit,
     onConfirm: (payerId: String, receiverId: String, amountCents: Long) -> Unit
 ) {
     if (members.size < 2) return
 
-    var payerId by remember { mutableStateOf(members.first().id) }
-    var receiverId by remember { mutableStateOf(members.last().id) }
-    var amountInput by remember { mutableStateOf("") }
+    var payerId by remember(initialPayerId) {
+        mutableStateOf(initialPayerId ?: members.first().id)
+    }
+    var receiverId by remember(initialReceiverId) {
+        mutableStateOf(initialReceiverId ?: members.firstOrNull { it.id != payerId }?.id ?: members.last().id)
+    }
+    var amountInput by remember(initialAmountCents) {
+        mutableStateOf(
+            if (initialAmountCents != null && initialAmountCents > 0) {
+                if (currency in listOf("IDR", "VND", "JPY")) (initialAmountCents / 100).toString()
+                else String.format(java.util.Locale.US, "%.2f", initialAmountCents / 100.0)
+            } else ""
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
