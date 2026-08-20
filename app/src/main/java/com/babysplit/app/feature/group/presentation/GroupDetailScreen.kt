@@ -1176,20 +1176,19 @@ private fun BalancesTab(
                 }
             }
 
-            // Detailed Journey Card for Selected Member
-            val selectedMember = members.firstOrNull { it.id == selectedJourneyMemberId } ?: members.first()
-            val memberBalance = balances.firstOrNull { it.memberId == selectedMember.id }
-            val memberPaidCents = expenses.filter { it.paidByMemberId == selectedMember.id && !it.isSettlement }.sumOf { it.totalAmountCents }
-            val memberConsumedShareCents = expenses.filter { !it.isSettlement }.flatMap { it.participants }.filter { it.memberId == selectedMember.id }.sumOf { it.amountCents }
-            val netCents = memberBalance?.netBalanceCents ?: (memberPaidCents - memberConsumedShareCents)
-
-            val memberExpenses = remember(expenses, selectedMember) {
-                expenses.filter { exp ->
-                    exp.paidByMemberId == selectedMember.id || exp.participants.any { it.memberId == selectedMember.id }
-                }.sortedByDescending { it.createdAtEpochMs }
-            }
-
             item {
+                val selectedMember = members.firstOrNull { it.id == selectedJourneyMemberId } ?: members.first()
+                val memberBalance = balances.firstOrNull { it.memberId == selectedMember.id }
+                val memberPaidCents = expenses.filter { it.paidByMemberId == selectedMember.id && !it.isSettlement }.sumOf { it.totalAmountCents }
+                val memberConsumedShareCents = expenses.filter { !it.isSettlement }.flatMap { it.participants }.filter { it.memberId == selectedMember.id }.sumOf { it.amountCents }
+                val netCents = memberBalance?.netBalanceCents ?: (memberPaidCents - memberConsumedShareCents)
+
+                val memberExpenses = remember(expenses, selectedMember) {
+                    expenses.filter { exp ->
+                        exp.paidByMemberId == selectedMember.id || exp.participants.any { it.memberId == selectedMember.id }
+                    }.sortedByDescending { it.createdAtEpochMs }
+                }
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
