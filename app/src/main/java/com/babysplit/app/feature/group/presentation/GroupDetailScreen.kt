@@ -1203,58 +1203,37 @@ private fun BalancesTab(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // Header: Member Name & Overall Journey Status
+                        // Header: Member Name & Activity Count
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (netCents > 0) Color(0xFFE8F5E9) else if (netCents < 0) Color(0xFFFFEBEE) else BackgroundLight,
-                                    modifier = Modifier.size(38.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = selectedMember.name.take(1).uppercase(),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp,
-                                            color = if (netCents > 0) SettledGreen else if (netCents < 0) DebtRed else TextSecondary
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
+                            Surface(
+                                shape = CircleShape,
+                                color = if (netCents > 0) Color(0xFFE8F5E9) else if (netCents < 0) Color(0xFFFFEBEE) else BackgroundLight,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = "${selectedMember.name}'s Breakdown",
+                                        text = selectedMember.name.take(1).uppercase(),
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = TextPrimary
-                                    )
-                                    Text(
-                                        text = "${memberExpenses.size} activity record${if (memberExpenses.size != 1) "s" else ""}",
-                                        fontSize = 11.sp,
-                                        color = TextSecondary
+                                        fontSize = 16.sp,
+                                        color = if (netCents > 0) SettledGreen else if (netCents < 0) DebtRed else TextSecondary
                                     )
                                 }
                             }
-
-                            Surface(
-                                shape = RoundedCornerShape(100.dp),
-                                color = if (netCents > 0) Color(0xFFE8F5E9) else if (netCents < 0) Color(0xFFFFEBEE) else BackgroundLight,
-                                border = BorderStroke(1.dp, if (netCents > 0) Color(0xFF81C784) else if (netCents < 0) Color(0xFFE57373) else SurfaceBorderLight)
-                            ) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
                                 Text(
-                                    text = when {
-                                        netCents > 0 -> "+${BillSummaryFormatter.formatCents(netCents, currency)}"
-                                        netCents < 0 -> "-${BillSummaryFormatter.formatCents(-netCents, currency)}"
-                                        else -> "Settled"
-                                    },
-                                    fontSize = 12.sp,
+                                    text = "${selectedMember.name}'s Breakdown",
                                     fontWeight = FontWeight.Bold,
-                                    color = if (netCents > 0) SettledGreen else if (netCents < 0) DebtRed else TextSecondary,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    fontSize = 15.sp,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "${memberExpenses.size} activity record${if (memberExpenses.size != 1) "s" else ""}",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary
                                 )
                             }
                         }
@@ -1366,34 +1345,45 @@ private fun BalancesTab(
                                     val category = ExpenseCategory.fromName(exp.categoryName)
                                     val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(exp.createdAtEpochMs))
 
+                                    // Net impact tag for this item
+                                    val impactCents = if (exp.isSettlement) {
+                                        if (isPayer) exp.totalAmountCents else -exp.totalAmountCents
+                                    } else {
+                                        if (isPayer) (exp.totalAmountCents - myShareCents) else -myShareCents
+                                    }
+
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = BackgroundLight,
                                         border = BorderStroke(1.dp, SurfaceBorderLight.copy(alpha = 0.6f)),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Row(
+                                        Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
+                                            // Top Row: Category Icon + Title (Left) and Net Impact (Right)
                                             Row(
+                                                modifier = Modifier.fillMaxWidth(),
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                modifier = Modifier.weight(1f)
+                                                horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
-                                                Surface(
-                                                    shape = CircleShape,
-                                                    color = if (exp.isSettlement) Color(0xFFE8F5E9) else ChickYellowLight,
-                                                    modifier = Modifier.size(34.dp)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
                                                 ) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Text(if (exp.isSettlement) "💸" else category.emoji, fontSize = 16.sp)
+                                                    Surface(
+                                                        shape = CircleShape,
+                                                        color = if (exp.isSettlement) Color(0xFFE8F5E9) else ChickYellowLight,
+                                                        modifier = Modifier.size(30.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Text(if (exp.isSettlement) "💸" else category.emoji, fontSize = 14.sp)
+                                                        }
                                                     }
-                                                }
-                                                Spacer(modifier = Modifier.width(10.dp))
-                                                Column {
+                                                    Spacer(modifier = Modifier.width(8.dp))
                                                     Text(
                                                         text = exp.title,
                                                         fontWeight = FontWeight.Bold,
@@ -1401,39 +1391,55 @@ private fun BalancesTab(
                                                         color = TextPrimary,
                                                         maxLines = 1
                                                     )
-                                                    val subtext = if (exp.isSettlement) {
-                                                        if (isPayer) "Settlement sent to ${exp.participants.firstOrNull()?.memberName ?: "member"}"
-                                                        else "Settlement received from ${exp.paidByMemberName}"
-                                                    } else {
-                                                        if (isPayer) {
-                                                            "Paid ${BillSummaryFormatter.formatCents(exp.totalAmountCents, currency)} • Share: ${BillSummaryFormatter.formatCents(myShareCents, currency)}"
-                                                        } else {
-                                                            "Paid by ${exp.paidByMemberName} • Share: ${BillSummaryFormatter.formatCents(myShareCents, currency)}"
-                                                        }
-                                                    }
+                                                }
+
+                                                // Net impact badge (+ / -)
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (impactCents >= 0) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                                                ) {
                                                     Text(
-                                                        text = "$dateStr • $subtext",
-                                                        fontSize = 11.sp,
-                                                        color = TextSecondary,
-                                                        maxLines = 1
+                                                        text = if (impactCents >= 0) "+${BillSummaryFormatter.formatCents(impactCents, currency)}"
+                                                               else "-${BillSummaryFormatter.formatCents(-impactCents, currency)}",
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        fontSize = 12.sp,
+                                                        color = if (impactCents >= 0) SettledGreen else DebtRed,
+                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                                     )
                                                 }
                                             }
 
-                                            // Net impact tag for this item
-                                            val impactCents = if (exp.isSettlement) {
-                                                if (isPayer) exp.totalAmountCents else -exp.totalAmountCents
-                                            } else {
-                                                if (isPayer) (exp.totalAmountCents - myShareCents) else -myShareCents
-                                            }
+                                            // Bottom Row: Date & Bill Details (Left) + Personal Share (Right)
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(start = 38.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = if (exp.isSettlement) {
+                                                        if (isPayer) "$dateStr • Sent to ${exp.participants.firstOrNull()?.memberName ?: "member"}"
+                                                        else "$dateStr • Received from ${exp.paidByMemberName}"
+                                                    } else {
+                                                        if (isPayer) "$dateStr • Paid ${BillSummaryFormatter.formatCents(exp.totalAmountCents, currency)}"
+                                                        else "$dateStr • Paid by ${exp.paidByMemberName}"
+                                                    },
+                                                    fontSize = 11.sp,
+                                                    color = TextSecondary,
+                                                    maxLines = 1,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
 
-                                            Text(
-                                                text = if (impactCents >= 0) "+${BillSummaryFormatter.formatCents(impactCents, currency)}"
-                                                       else "-${BillSummaryFormatter.formatCents(-impactCents, currency)}",
-                                                fontWeight = FontWeight.ExtraBold,
-                                                fontSize = 13.sp,
-                                                color = if (impactCents >= 0) SettledGreen else DebtRed
-                                            )
+                                                if (!exp.isSettlement && myShareCents > 0) {
+                                                    Text(
+                                                        text = "Share: ${BillSummaryFormatter.formatCents(myShareCents, currency)}",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = TextSecondary
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
