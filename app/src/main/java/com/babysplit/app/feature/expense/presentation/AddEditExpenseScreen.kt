@@ -178,8 +178,8 @@ fun AddEditExpenseScreen(
             }
             SplitCalculator.MemberInput(
                 memberId = m.id,
-                name = m.name,
-                rawInput = rawVal
+                memberName = m.name,
+                inputValue = rawVal
             )
         }
     }
