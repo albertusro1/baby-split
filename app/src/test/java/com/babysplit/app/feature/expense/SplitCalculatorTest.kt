@@ -26,6 +26,24 @@ class SplitCalculatorTest {
     }
 
     @Test
+    fun testEqualSplitWithUntickedParticipants() {
+        // $100.00 split among 3 people where Charlie is unticked (inputValue = 0.0) -> Alice $50.00, Bob $50.00, Charlie $0.00
+        val members = listOf(
+            SplitCalculator.MemberInput("1", "Alice", 1.0),
+            SplitCalculator.MemberInput("2", "Bob", 1.0),
+            SplitCalculator.MemberInput("3", "Charlie", 0.0)
+        )
+
+        val result = SplitCalculator.calculateSplit(10000L, members, SplitType.EQUAL)
+
+        assertEquals(3, result.size)
+        assertEquals(5000L, result[0].amountCents)
+        assertEquals(5000L, result[1].amountCents)
+        assertEquals(0L, result[2].amountCents)
+        assertEquals(10000L, result.sumOf { it.amountCents })
+    }
+
+    @Test
     fun testExactSplit() {
         val members = listOf(
             SplitCalculator.MemberInput("1", "Alice", 2500.0), // $25.00

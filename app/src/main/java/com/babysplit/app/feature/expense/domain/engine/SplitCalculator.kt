@@ -56,7 +56,8 @@ object SplitCalculator {
         totalAmountCents: Long,
         members: List<MemberInput>
     ): List<ExpenseParticipant> {
-        val activeMembers = members.filter { it.inputValue > 0.0 }
+        val hasExplicitSelection = members.any { it.inputValue > 0.0 }
+        val activeMembers = if (hasExplicitSelection) members.filter { it.inputValue > 0.0 } else members
         if (activeMembers.isEmpty()) {
             return members.map {
                 ExpenseParticipant(
