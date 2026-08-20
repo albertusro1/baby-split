@@ -49,24 +49,47 @@ object SplitCalculator {
     }
 
     /**
-     * Equal Split: Base share = floor(total / N), remainder cents assigned to first R participants.
+     * Equal Split: Base share = floor(total / N_active), remainder cents assigned to first R active participants.
+     * Unticked participants (inputValue <= 0.0) receive 0 cents.
      */
     private fun calculateEqualSplit(
         totalAmountCents: Long,
         members: List<MemberInput>
     ): List<ExpenseParticipant> {
-        val n = members.size
+        val activeMembers = members.filter { it.inputValue > 0.0 }
+        if (activeMembers.isEmpty()) {
+            return members.map {
+                ExpenseParticipant(
+                    memberId = it.memberId,
+                    memberName = it.memberName,
+                    amountCents = 0L,
+                    rawShareValue = 0.0
+                )
+            }
+        }
+
+        val n = activeMembers.size
         val baseShare = totalAmountCents / n
         val remainder = (totalAmountCents % n).toInt()
 
-        return members.mapIndexed { index, member ->
-            val extraCent = if (index < remainder) 1L else 0L
-            ExpenseParticipant(
-                memberId = member.memberId,
-                memberName = member.memberName,
-                amountCents = baseShare + extraCent,
-                rawShareValue = 1.0
-            )
+        return members.map { member ->
+            val activeIndex = activeMembers.indexOfFirst { it.memberId == member.memberId }
+            if (activeIndex >= 0) {
+                val extraCent = if (activeIndex < remainder) 1L else 0L
+                ExpenseParticipant(
+                    memberId = member.memberId,
+                    memberName = member.memberName,
+                    amountCents = baseShare + extraCent,
+                    rawShareValue = 1.0
+                )
+            } else {
+                ExpenseParticipant(
+                    memberId = member.memberId,
+                    memberName = member.memberName,
+                    amountCents = 0L,
+                    rawShareValue = 0.0
+                )
+            }
         }
     }
 

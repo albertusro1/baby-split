@@ -167,7 +167,7 @@ fun AddEditExpenseScreen(
         }
     }
 
-    val memberInputList = remember(members, equalSelectionMap, memberInputs, splitType) {
+    val memberInputList = remember(members, equalSelectionMap.toMap(), memberInputs.toMap(), splitType) {
         members.map { m ->
             val isSelected = equalSelectionMap[m.id] ?: true
             val rawStr = memberInputs[m.id] ?: "0"
