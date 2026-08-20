@@ -77,7 +77,7 @@ fun GroupDetailScreen(
     var showFinishTripDialog by remember { mutableStateOf(false) }
     var showDeleteTripDialog by remember { mutableStateOf(false) }
 
-    val tabs = listOf("Expenses", "Balances & Settle", "Totals")
+    val tabs = listOf("Expenses", "Balances", "Totals")
     val memberMap = remember(members) { members.associate { it.id to it.name } }
 
     val memberBalances = remember(expenses, memberMap) {
@@ -153,7 +153,15 @@ fun GroupDetailScreen(
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = SurfaceLight,
-                contentColor = ChickAmber
+                contentColor = ChickAmber,
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = ChickAmber,
+                        height = 3.dp
+                    )
+                },
+                divider = { HorizontalDivider(color = SurfaceBorderLight) }
             ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
@@ -161,8 +169,10 @@ fun GroupDetailScreen(
                         onClick = { selectedTab = index },
                         text = {
                             Text(
-                                title,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                text = title,
+                                maxLines = 1,
+                                fontSize = 14.sp,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
                                 color = if (selectedTab == index) ChickAmber else TextSecondary
                             )
                         }

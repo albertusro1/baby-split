@@ -4,7 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
@@ -12,12 +14,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.babysplit.app.core.ui.theme.*
+import com.babysplit.app.core.whatsapp.WhatsAppShareHelper
+
+private const val APP_DOWNLOAD_LINK = "https://drive.google.com/file/d/1bIcGEMizeV_bNiQs3iLcItDcTk89IRHT/view?usp=drive_link"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,70 +36,88 @@ fun InviteMembersSheet(
     val context = LocalContext.current
     var showCopiedSnackbar by remember { mutableStateOf(false) }
 
+    fun buildShareMessage(): String {
+        return buildString {
+            appendLine("👶 *Join my trip \"$tripName\" on Baby Split!*")
+            appendLine()
+            appendLine("🔑 *Trip Invite Code:* $inviteCode")
+            appendLine()
+            appendLine("📲 *Download Baby Split App:*")
+            appendLine(APP_DOWNLOAD_LINK)
+            appendLine()
+            appendLine("👉 *How to join:*")
+            appendLine("1. Download & open Baby Split")
+            appendLine("2. Sign in with Google")
+            appendLine("3. Tap \"*Join Trip by Code*\" on the dashboard")
+            appendLine("4. Enter code: *$inviteCode*")
+        }.trim()
+    }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceLight,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(bottom = 36.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "👥 Invite Members",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Share this code with friends to let them join \"$tripName\"",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "👥 Invite Friends to Trip",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Share this code so your friends can join \"$tripName\" and view & split expenses in real-time.",
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+            }
 
             // Large invite code display
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = ChickYellowLight),
+                border = BorderStroke(1.dp, ChickGold)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Invite Code",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        text = "INVITE CODE",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF7A4F00),
+                        letterSpacing = 2.sp
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = inviteCode,
-                        style = MaterialTheme.typography.displaySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 4.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        fontSize = 32.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 6.sp,
+                        color = ChickAmber
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
             // Action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedButton(
                     onClick = {
@@ -100,52 +125,67 @@ fun InviteMembersSheet(
                         clipboard.setPrimaryClip(ClipData.newPlainText("Invite Code", inviteCode))
                         showCopiedSnackbar = true
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SurfaceBorderLight)
                 ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Copy Code")
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextPrimary)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Copy Code", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 }
 
                 Button(
                     onClick = {
-                        val shareText = "👶 Join my trip \"$tripName\" on Baby Split!\n\nInvite Code: $inviteCode\n\nDownload Baby Split and enter this code to join."
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Share Invite Code"))
+                        val msg = buildShareMessage()
+                        WhatsAppShareHelper.shareToWhatsApp(context, msg)
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = WhatsAppDarkGreen, contentColor = Color.White),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Share")
+                    Text("Share WA 📲", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
+            // General Share Button (for other apps / Telegram / SMS)
+            OutlinedButton(
+                onClick = {
+                    val shareText = buildShareMessage()
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, shareText)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Share Trip Invite"))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, SurfaceBorderLight)
+            ) {
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextSecondary)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Share via Other Apps...", fontSize = 13.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
+            }
+
             if (showCopiedSnackbar) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "✅ Code copied to clipboard!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SettledGreen.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, SettledGreen.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = "✅ Invite code copied to clipboard!",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SettledGreen,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
                 LaunchedEffect(Unit) {
                     kotlinx.coroutines.delay(2000)
                     showCopiedSnackbar = false
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Members who sign in with Google and enter this code will be able to see and edit all expenses in real-time.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
         }
     }
 }
+

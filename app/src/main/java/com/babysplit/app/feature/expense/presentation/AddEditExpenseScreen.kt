@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -40,11 +41,22 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
+private fun sanitizeNumberInput(input: String): String {
+    val filtered = input.filter { it.isDigit() || it == '.' || it == ',' }.replace(",", ".")
+    val parts = filtered.split(".")
+    val normalized = if (parts.size > 2) parts[0] + "." + parts.drop(1).joinToString("") else filtered
+    return if (normalized.length > 1 && normalized.startsWith("0") && normalized[1] != '.') {
+        normalized.trimStart('0').ifEmpty { "0" }
+    } else {
+        normalized
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditExpenseScreen(
     tripId: String,
-    currency: String,
+    currency: String = "USD",
     members: List<MemberData>,
     existingExpense: ExpenseData? = null,
     onBackClick: () -> Unit,
@@ -94,7 +106,6 @@ fun AddEditExpenseScreen(
         }
     }
 
-    // Equal split member selection map (id -> included)
     val equalSelectionMap = remember(members, existingExpense) {
         mutableStateMapOf<String, Boolean>().apply {
             members.forEach { m ->
@@ -103,7 +114,6 @@ fun AddEditExpenseScreen(
         }
     }
 
-    // Input state map for custom split types
     val memberInputs = remember(members, existingExpense) {
         mutableStateMapOf<String, String>().apply {
             members.forEach { m ->
@@ -113,7 +123,6 @@ fun AddEditExpenseScreen(
         }
     }
 
-    // Photo picker launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -125,14 +134,12 @@ fun AddEditExpenseScreen(
         }
     }
 
-    // Parse raw digits from amountInput into integer cents
     val totalAmountCents = remember(amountInput) {
         val clean = amountInput.filter { it.isDigit() || it == '.' || it == ',' }.replace(",", ".")
         val doubleVal = clean.toDoubleOrNull() ?: 0.0
         (doubleVal * 100).roundToLong()
     }
 
-    // Mode-switch helper to auto-populate smart defaults
     fun onSplitTypeChanged(newType: SplitType) {
         splitType = newType
         val n = members.size.coerceAtLeast(1)
@@ -141,14 +148,14 @@ fun AddEditExpenseScreen(
                 members.forEach { equalSelectionMap[it.id] = true }
             }
             SplitType.PERCENTAGE -> {
-                val defaultPct = (100.0 / n)
-                members.forEach {
-                    memberInputs[it.id] = if (defaultPct % 1.0 == 0.0) defaultPct.toInt().toString() else String.format(java.util.Locale.US, "%.1f", defaultPct)
-                }
+                val base = 100.0 / n
+                val roundedBase = String.format(java.util.Locale.US, "%.1f", base)
+                members.forEach { memberInputs[it.id] = roundedBase }
             }
             SplitType.EXACT -> {
-                val defaultPerPerson = if (totalAmountCents > 0) (totalAmountCents / 100) / n else 0L
-                members.forEach { memberInputs[it.id] = defaultPerPerson.toString() }
+                val base = if (totalAmountCents > 0) (totalAmountCents / 100.0) / n else 0.0
+                val formatted = if (currency in listOf("IDR", "VND", "JPY")) base.toLong().toString() else String.format(java.util.Locale.US, "%.2f", base)
+                members.forEach { memberInputs[it.id] = formatted }
             }
             SplitType.SHARE -> {
                 members.forEach { memberInputs[it.id] = "1" }
@@ -160,91 +167,46 @@ fun AddEditExpenseScreen(
         }
     }
 
-    // Real-time calculation of participants and validation status
-    val (calculatedParticipants, isValidSplit, validationMessage) = remember(
-        totalAmountCents,
-        splitType,
-        memberInputs.toMap(),
-        equalSelectionMap.toMap(),
-        members,
-        paidByMemberId
-    ) {
-        if (paidByMemberId.isBlank() || !members.any { it.id == paidByMemberId }) {
-            return@remember Triple(emptyList<ExpenseParticipant>(), false, "Please select who paid for this expense.")
+    val memberInputList = remember(members, equalSelectionMap, memberInputs, splitType) {
+        members.map { m ->
+            val isSelected = equalSelectionMap[m.id] ?: true
+            val rawStr = memberInputs[m.id] ?: "0"
+            val rawVal = if (splitType == SplitType.EQUAL) {
+                if (isSelected) 1.0 else 0.0
+            } else {
+                rawStr.toDoubleOrNull() ?: 0.0
+            }
+            SplitCalculator.MemberInput(
+                memberId = m.id,
+                name = m.name,
+                rawInput = rawVal
+            )
         }
-        if (totalAmountCents <= 0) {
-            return@remember Triple(emptyList<ExpenseParticipant>(), false, "Please enter an expense amount.")
-        }
+    }
 
-        when (splitType) {
-            SplitType.EQUAL -> {
-                val activeMembers = members.filter { equalSelectionMap[it.id] == true }
-                if (activeMembers.isEmpty()) {
-                    Triple(emptyList<ExpenseParticipant>(), false, "Select at least 1 person to split with.")
-                } else {
-                    val inputs = activeMembers.map { SplitCalculator.MemberInput(it.id, it.name, 1.0) }
-                    val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.EQUAL)
-                    Triple(parts, true, null)
-                }
-            }
+    val calculatedParticipants = remember(totalAmountCents, memberInputList, splitType) {
+        if (totalAmountCents <= 0) emptyList()
+        else SplitCalculator.calculateSplit(totalAmountCents, memberInputList, splitType)
+    }
+
+    val totalSplitCents = remember(calculatedParticipants) {
+        calculatedParticipants.sumOf { it.amountCents }
+    }
+    val splitDifferenceCents = remember(totalAmountCents, totalSplitCents) {
+        abs(totalAmountCents - totalSplitCents)
+    }
+    val isValidSplit = remember(totalAmountCents, totalSplitCents, calculatedParticipants, splitType) {
+        if (totalAmountCents <= 0) false
+        else when (splitType) {
+            SplitType.EQUAL -> calculatedParticipants.any { it.amountCents > 0 }
             SplitType.PERCENTAGE -> {
-                val sumPct = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
-                val remainingPct = 100.0 - sumPct
-                val isValid = kotlin.math.abs(remainingPct) < 0.01
-                val inputs = members.map {
-                    SplitCalculator.MemberInput(it.id, it.name, memberInputs[it.id]?.toDoubleOrNull() ?: 0.0)
-                }
-                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.PERCENTAGE)
-                val msg = if (!isValid) {
-                    val formattedSum = if (sumPct % 1.0 == 0.0) sumPct.toInt().toString() else String.format(java.util.Locale.US, "%.1f", sumPct)
-                    val formattedRem = if (remainingPct % 1.0 == 0.0) remainingPct.toInt().toString() else String.format(java.util.Locale.US, "%.1f", remainingPct)
-                    "Total is $formattedSum% ($formattedRem% remaining). Must equal 100%."
-                } else null
-                Triple(parts, isValid, msg)
+                val totalPercent = memberInputs.values.sumOf { it.toDoubleOrNull() ?: 0.0 }
+                abs(totalPercent - 100.0) < 0.1
             }
-            SplitType.EXACT -> {
-                val sumExactDollars = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
-                val sumExactCents = (sumExactDollars * 100).roundToLong()
-                val diffCents = totalAmountCents - sumExactCents
-                val isValid = diffCents == 0L
-                val inputs = members.map {
-                    val cents = ((memberInputs[it.id]?.toDoubleOrNull() ?: 0.0) * 100).roundToLong()
-                    SplitCalculator.MemberInput(it.id, it.name, cents.toDouble())
-                }
-                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.EXACT)
-                val msg = if (!isValid) {
-                    val formattedAssigned = BillSummaryFormatter.formatCents(sumExactCents, currency)
-                    val formattedDiff = BillSummaryFormatter.formatCents(kotlin.math.abs(diffCents), currency)
-                    if (diffCents > 0) "Assigned: $formattedAssigned ($formattedDiff remaining)." else "Assigned: $formattedAssigned (over by $formattedDiff)."
-                } else null
-                Triple(parts, isValid, msg)
-            }
-            SplitType.SHARE -> {
-                val totalShares = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
-                val isValid = totalShares > 0.0
-                val inputs = members.map {
-                    SplitCalculator.MemberInput(it.id, it.name, (memberInputs[it.id]?.toDoubleOrNull() ?: 0.0).coerceAtLeast(0.0))
-                }
-                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.SHARE)
-                val msg = if (!isValid) "At least one person must have > 0 shares." else null
-                Triple(parts, isValid, msg)
-            }
-            SplitType.ADJUSTMENT -> {
-                val sumAdjDollars = members.sumOf { memberInputs[it.id]?.toDoubleOrNull() ?: 0.0 }
-                val sumAdjCents = (sumAdjDollars * 100).roundToLong()
-                val isValid = totalAmountCents >= sumAdjCents
-                val inputs = members.map {
-                    val cents = ((memberInputs[it.id]?.toDoubleOrNull() ?: 0.0) * 100).roundToLong()
-                    SplitCalculator.MemberInput(it.id, it.name, cents.toDouble())
-                }
-                val parts = SplitCalculator.calculateSplit(totalAmountCents, inputs, SplitType.ADJUSTMENT)
-                val msg = if (!isValid) {
-                    val formattedAdj = BillSummaryFormatter.formatCents(sumAdjCents, currency)
-                    "Sum of adjustments ($formattedAdj) cannot exceed total expense."
-                } else null
-                Triple(parts, isValid, msg)
-            }
-            else -> Triple(emptyList(), false, null)
+            SplitType.EXACT -> totalSplitCents == totalAmountCents
+            SplitType.SHARE -> memberInputs.values.any { (it.toDoubleOrNull() ?: 0.0) > 0 }
+            SplitType.ADJUSTMENT -> true
+            else -> true
         }
     }
 
@@ -303,9 +265,14 @@ fun AddEditExpenseScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    if (validationMessage != null && totalAmountCents > 0) {
+                    if (!isValidSplit && totalAmountCents > 0) {
                         Text(
-                            text = validationMessage,
+                            text = when (splitType) {
+                                SplitType.PERCENTAGE -> "Total percentage must equal 100% (currently ${memberInputs.values.sumOf { it.toDoubleOrNull() ?: 0.0 }}%)"
+                                SplitType.EXACT -> "Remaining unallocated: ${BillSummaryFormatter.formatCents(totalAmountCents - totalSplitCents, currency)}"
+                                SplitType.SHARE -> "At least one member must have > 0 shares"
+                                else -> "Please select at least one member"
+                            },
                             color = DebtRed,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -362,7 +329,6 @@ fun AddEditExpenseScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. Amount Input Card
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Card(
@@ -382,8 +348,7 @@ fun AddEditExpenseScreen(
                         OutlinedTextField(
                             value = amountInput,
                             onValueChange = { input ->
-                                val filtered = input.filter { it.isDigit() || it == '.' || it == ',' }
-                                amountInput = filtered
+                                amountInput = sanitizeNumberInput(input)
                             },
                             placeholder = {
                                 Text(
@@ -410,13 +375,18 @@ fun AddEditExpenseScreen(
                                 focusedBorderColor = ChickAmber,
                                 unfocusedBorderColor = SurfaceBorderLight
                             ),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    if (focusState.isFocused && (amountInput == "0" || amountInput == "0.00" || amountInput == "0.0")) {
+                                        amountInput = ""
+                                    }
+                                }
                         )
                     }
                 }
             }
 
-            // 2. Title / Description
             item {
                 OutlinedTextField(
                     value = title,
@@ -553,18 +523,28 @@ fun AddEditExpenseScreen(
                                     OutlinedTextField(
                                         value = memberInputs[member.id] ?: "",
                                         onValueChange = { newVal ->
-                                            val filtered = newVal.filter { it.isDigit() || it == '.' || it == ',' }.replace(",", ".")
+                                            val cleaned = sanitizeNumberInput(newVal)
                                             if (splitType == SplitType.PERCENTAGE) {
-                                                val pctVal = filtered.toDoubleOrNull() ?: 0.0
+                                                val pctVal = cleaned.toDoubleOrNull() ?: 0.0
                                                 if (pctVal <= 100.0) {
-                                                    memberInputs[member.id] = filtered
+                                                    memberInputs[member.id] = cleaned
                                                 }
                                             } else {
-                                                memberInputs[member.id] = filtered
+                                                memberInputs[member.id] = cleaned
                                             }
                                         },
+                                        placeholder = { Text("0", textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth()) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        modifier = Modifier.width(95.dp),
+                                        modifier = Modifier
+                                            .width(95.dp)
+                                            .onFocusChanged { focusState ->
+                                                if (focusState.isFocused) {
+                                                    val current = memberInputs[member.id]
+                                                    if (current == "0" || (splitType == SplitType.SHARE && current == "1")) {
+                                                        memberInputs[member.id] = ""
+                                                    }
+                                                }
+                                            },
                                         singleLine = true,
                                         shape = RoundedCornerShape(8.dp),
                                         textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, textAlign = TextAlign.End)

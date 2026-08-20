@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -65,13 +66,28 @@ fun RecordSettlementDialog(
 
                 OutlinedTextField(
                     value = amountInput,
-                    onValueChange = { amountInput = it },
+                    onValueChange = { input ->
+                        val filtered = input.filter { it.isDigit() || it == '.' || it == ',' }.replace(",", ".")
+                        val parts = filtered.split(".")
+                        val normalized = if (parts.size > 2) parts[0] + "." + parts.drop(1).joinToString("") else filtered
+                        amountInput = if (normalized.length > 1 && normalized.startsWith("0") && normalized[1] != '.') {
+                            normalized.trimStart('0').ifEmpty { "0" }
+                        } else {
+                            normalized
+                        }
+                    },
                     label = { Text("Amount ($currency)") },
-                    placeholder = { Text("0.00") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    placeholder = { Text("0") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused && (amountInput == "0" || amountInput == "0.00" || amountInput == "0.0")) {
+                                amountInput = ""
+                            }
+                        }
                 )
             }
         },
