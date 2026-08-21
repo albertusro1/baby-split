@@ -106,6 +106,23 @@ fun AddEditExpenseScreen(
         }
     }
 
+    val totalAmountCents = remember(amountInput) {
+        val clean = amountInput.filter { it.isDigit() || it == '.' || it == ',' }.replace(",", ".")
+        val doubleVal = clean.toDoubleOrNull() ?: 0.0
+        (doubleVal * 100).roundToLong()
+    }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val savedPath = ReceiptCompressor.compressAndSaveReceipt(context, uri)
+                receiptPath = savedPath
+            }
+        }
+    }
+
     val equalSelectionMap = remember(members, existingExpense) {
         mutableStateMapOf<String, Boolean>().apply {
             members.forEach { m ->
@@ -153,23 +170,6 @@ fun AddEditExpenseScreen(
                 }
             }
         }
-    }
-
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            scope.launch {
-                val savedPath = ReceiptCompressor.compressAndSaveReceipt(context, uri)
-                receiptPath = savedPath
-            }
-        }
-    }
-
-    val totalAmountCents = remember(amountInput) {
-        val clean = amountInput.filter { it.isDigit() || it == '.' || it == ',' }.replace(",", ".")
-        val doubleVal = clean.toDoubleOrNull() ?: 0.0
-        (doubleVal * 100).roundToLong()
     }
 
     fun onSplitTypeChanged(newType: SplitType) {
