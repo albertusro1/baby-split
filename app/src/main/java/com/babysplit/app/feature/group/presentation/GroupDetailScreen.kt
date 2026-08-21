@@ -1368,6 +1368,7 @@ private fun BalancesTab(
                                     } else {
                                         if (isPayer) (exp.totalAmountCents - myShareCents) else -myShareCents
                                     }
+                                    val isSelfPaidPersonal = !exp.isSettlement && impactCents == 0L
 
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
@@ -1410,19 +1411,35 @@ private fun BalancesTab(
                                                     )
                                                 }
 
-                                                // Net impact badge (+ / -)
-                                                Surface(
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    color = if (impactCents >= 0) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
-                                                ) {
-                                                    Text(
-                                                        text = if (impactCents >= 0) "+${BillSummaryFormatter.formatCents(impactCents, currency)}"
-                                                               else "-${BillSummaryFormatter.formatCents(-impactCents, currency)}",
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        fontSize = 12.sp,
-                                                        color = if (impactCents >= 0) SettledGreen else DebtRed,
-                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                                    )
+                                                // Net impact badge (+ / - / Self-Paid)
+                                                if (isSelfPaidPersonal) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = Color(0xFFF3F4F6),
+                                                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                                                    ) {
+                                                        Text(
+                                                            text = "Self-Paid",
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 11.sp,
+                                                            color = Color(0xFF4B5563),
+                                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                } else {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = if (impactCents > 0) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                                                    ) {
+                                                        Text(
+                                                            text = if (impactCents > 0) "+${BillSummaryFormatter.formatCents(impactCents, currency)}"
+                                                                   else "-${BillSummaryFormatter.formatCents(-impactCents, currency)}",
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            fontSize = 12.sp,
+                                                            color = if (impactCents > 0) SettledGreen else DebtRed,
+                                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                                        )
+                                                    }
                                                 }
                                             }
 
@@ -1438,6 +1455,9 @@ private fun BalancesTab(
                                                     text = if (exp.isSettlement) {
                                                         if (isPayer) "$dateStr • Sent to ${exp.participants.firstOrNull()?.memberName ?: "member"}"
                                                         else "$dateStr • Received from ${exp.paidByMemberName}"
+                                                    } else if (isSelfPaidPersonal) {
+                                                        if (isPayer) "$dateStr • Paid full bill for self"
+                                                        else "$dateStr • Paid by ${exp.paidByMemberName}"
                                                     } else {
                                                         if (isPayer) "$dateStr • Paid ${BillSummaryFormatter.formatCents(exp.totalAmountCents, currency)}"
                                                         else "$dateStr • Paid by ${exp.paidByMemberName}"
@@ -1448,13 +1468,22 @@ private fun BalancesTab(
                                                     modifier = Modifier.weight(1f, fill = false)
                                                 )
 
-                                                if (!exp.isSettlement && myShareCents > 0) {
-                                                    Text(
-                                                        text = "Share: ${BillSummaryFormatter.formatCents(myShareCents, currency)}",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = TextSecondary
-                                                    )
+                                                if (!exp.isSettlement) {
+                                                    if (isSelfPaidPersonal && isPayer) {
+                                                        Text(
+                                                            text = "Total: ${BillSummaryFormatter.formatCents(exp.totalAmountCents, currency)}",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = TextSecondary
+                                                        )
+                                                    } else if (myShareCents > 0) {
+                                                        Text(
+                                                            text = "Share: ${BillSummaryFormatter.formatCents(myShareCents, currency)}",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = TextSecondary
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }

@@ -116,9 +116,41 @@ fun AddEditExpenseScreen(
 
     val memberInputs = remember(members, existingExpense) {
         mutableStateMapOf<String, String>().apply {
+            val n = members.size.coerceAtLeast(1)
             members.forEach { m ->
                 val p = existingExpense?.participants?.firstOrNull { it.memberId == m.id }
-                put(m.id, p?.rawShareValue?.toString() ?: (if (splitType == SplitType.PERCENTAGE) (100.0 / members.size.coerceAtLeast(1)).toInt().toString() else "1"))
+                if (existingExpense != null && p != null) {
+                    val initialVal = when (existingExpense.splitType) {
+                        "EXACT" -> {
+                            val major = p.amountCents / 100.0
+                            if (currency in listOf("IDR", "VND", "JPY")) major.toLong().toString() else String.format(java.util.Locale.US, "%.2f", major)
+                        }
+                        "ADJUSTMENT" -> {
+                            val major = p.rawShareValue / 100.0
+                            if (currency in listOf("IDR", "VND", "JPY")) major.toLong().toString() else String.format(java.util.Locale.US, "%.2f", major)
+                        }
+                        "PERCENTAGE" -> {
+                            if (p.rawShareValue % 1.0 == 0.0) p.rawShareValue.toInt().toString() else p.rawShareValue.toString()
+                        }
+                        "SHARE" -> {
+                            if (p.rawShareValue % 1.0 == 0.0) p.rawShareValue.toInt().toString() else p.rawShareValue.toString()
+                        }
+                        else -> "1"
+                    }
+                    put(m.id, initialVal)
+                } else {
+                    val defaultVal = when (splitType) {
+                        SplitType.PERCENTAGE -> (100.0 / n).toInt().toString()
+                        SplitType.EXACT -> {
+                            val base = if (totalAmountCents > 0) (totalAmountCents / 100.0) / n else 0.0
+                            if (currency in listOf("IDR", "VND", "JPY")) base.toLong().toString() else String.format(java.util.Locale.US, "%.2f", base)
+                        }
+                        SplitType.SHARE -> "1"
+                        SplitType.ADJUSTMENT -> "0"
+                        else -> "1"
+                    }
+                    put(m.id, defaultVal)
+                }
             }
         }
     }
@@ -171,10 +203,19 @@ fun AddEditExpenseScreen(
         members.map { m ->
             val isSelected = equalSelectionMap[m.id] ?: true
             val rawStr = memberInputs[m.id] ?: "0"
-            val rawVal = if (splitType == SplitType.EQUAL) {
-                if (isSelected) 1.0 else 0.0
-            } else {
-                rawStr.toDoubleOrNull() ?: 0.0
+            val rawVal = when (splitType) {
+                SplitType.EQUAL -> if (isSelected) 1.0 else 0.0
+                SplitType.EXACT -> {
+                    val clean = rawStr.filter { it.isDigit() || it == '.' || it == ',' }.replace(",", ".")
+                    val num = clean.toDoubleOrNull() ?: 0.0
+                    (num * 100).roundToLong().toDouble()
+                }
+                SplitType.ADJUSTMENT -> {
+                    val clean = rawStr.filter { it.isDigit() || it == '.' || it == ',' || it == '-' }.replace(",", ".")
+                    val num = clean.toDoubleOrNull() ?: 0.0
+                    (num * 100).roundToLong().toDouble()
+                }
+                else -> rawStr.toDoubleOrNull() ?: 0.0
             }
             SplitCalculator.MemberInput(
                 memberId = m.id,
@@ -205,7 +246,7 @@ fun AddEditExpenseScreen(
             }
             SplitType.EXACT -> totalSplitCents == totalAmountCents
             SplitType.SHARE -> memberInputs.values.any { (it.toDoubleOrNull() ?: 0.0) > 0 }
-            SplitType.ADJUSTMENT -> true
+            SplitType.ADJUSTMENT -> totalSplitCents == totalAmountCents
             else -> true
         }
     }
@@ -269,8 +310,13 @@ fun AddEditExpenseScreen(
                         Text(
                             text = when (splitType) {
                                 SplitType.PERCENTAGE -> "Total percentage must equal 100% (currently ${memberInputs.values.sumOf { it.toDoubleOrNull() ?: 0.0 }}%)"
-                                SplitType.EXACT -> "Remaining unallocated: ${BillSummaryFormatter.formatCents(totalAmountCents - totalSplitCents, currency)}"
+                                SplitType.EXACT -> {
+                                    val diff = totalAmountCents - totalSplitCents
+                                    if (diff > 0) "Remaining unallocated: ${BillSummaryFormatter.formatCents(diff, currency)}"
+                                    else "Over-allocated by ${BillSummaryFormatter.formatCents(-diff, currency)}"
+                                }
                                 SplitType.SHARE -> "At least one member must have > 0 shares"
+                                SplitType.ADJUSTMENT -> "Total adjustments must balance the total amount"
                                 else -> "Please select at least one member"
                             },
                             color = DebtRed,
